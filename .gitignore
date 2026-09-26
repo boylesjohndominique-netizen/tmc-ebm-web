@@ -1,0 +1,64 @@
+# Laravel
+/backend/.env
+
+/backend/storage/*
+/backend/storage/framework/*
+/backend/storage/logs/*
+/backend/bootstrap/cache/*
+
+# Keep required Laravel directories
+!/backend/storage/
+!/backend/storage/app/
+!/backend/storage/framework/
+!/backend/storage/framework/cache/
+!/backend/storage/framework/sessions/
+!/backend/storage/framework/testing/
+!/backend/storage/framework/views/
+!/backend/storage/logs/
+
+# Laravel environment
+/backend/.env
+
+# Laravel generated/runtime files
+/backend/storage/*
+/backend/bootstrap/cache/*
+
+# Frontend dependencies
+/frontend/node_modules/
+
+# Frontend build output
+/frontend/dist/
+/frontend/build/
+
+# Laravel environment
+/backend/.env
+
+# Laravel runtime/generated files
+/backend/storage/*
+/backend/bootstrap/cache/*
+
+# =========================
+# Laravel
+# =========================
+
+/backend/.env
+
+/backend/vendor/
+/backend/storage/*
+/backend/bootstrap/cache/*
+
+# =========================
+# Frontend
+# =========================
+
+/frontend/node_modules/
+/frontend/dist/
+/frontend/build/
+
+# =========================
+# Environment files
+# =========================
+
+.env
+.env.local
+.env.*.local

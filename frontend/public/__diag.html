@@ -1,0 +1,14 @@
+<script>
+(async()=>{
+ const out=[];
+ out.push('token='+ (localStorage.getItem('tmc_token')||'NONE').slice(0,8));
+ try{
+  const r=await fetch('http://127.0.0.1:8000/api/me',{headers:{Authorization:'Bearer '+localStorage.getItem('tmc_token'),Accept:'application/json'}});
+  out.push('me HTTP='+r.status);
+  const j=await r.json();
+  out.push('user='+JSON.stringify(j.user||j).slice(0,120));
+ }catch(e){out.push('fetch ERR='+e.message)}
+ document.title='DIAG';
+ const p=document.createElement('pre'); p.id='diagout'; p.textContent=out.join(' | '); document.body.appendChild(p);
+})();
+</script>
