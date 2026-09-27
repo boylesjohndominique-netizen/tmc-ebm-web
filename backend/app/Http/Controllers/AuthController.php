@@ -105,13 +105,17 @@ class AuthController extends Controller
     public function mobileLogin(Request $request)
     {
         $data = $request->validate([
-            'login' => ['required', 'string'],
+            // Accept `login` (web convention) or `username` (older mobile builds)
+            'login' => ['required_without:username', 'string', 'nullable'],
+            'username' => ['required_without:login', 'string', 'nullable'],
             'password' => ['required', 'string'],
         ]);
 
-        $user = User::where(function ($query) use ($data) {
-            $query->where('email', $data['login'])
-                ->orWhere('username', $data['login']);
+        $identifier = trim($data['login'] ?? $data['username'] ?? '');
+
+        $user = User::where(function ($query) use ($identifier) {
+            $query->where('email', $identifier)
+                ->orWhere('username', $identifier);
         })
             ->with('role')
             ->first();

@@ -58,9 +58,10 @@ class ReturnManagementController extends Controller
         });
 
         $name = trim($updated->user?->first_name.' '.$updated->user?->last_name) ?: 'your return';
+        $remarks = $data['remarks'] ?? null;
         [$title, $message] = $data['status'] === 'Confirmed'
             ? ['Return Confirmed', "Thanks, {$name}! Your return for request #{$updated->borrowing_request_id} has been confirmed."]
-            : ['Return Rejected', "Your return for request #{$updated->borrowing_request_id} was rejected.".($data['remarks'] ? ' Reason: '.$data['remarks'] : '')];
+            : ['Return Rejected', "Your return for request #{$updated->borrowing_request_id} was rejected.".($remarks ? ' Reason: '.$remarks : '')];
 
         Notification::create([
             'user_id' => $updated->user_id,
@@ -76,7 +77,7 @@ class ReturnManagementController extends Controller
                     userName: trim($updated->user->first_name),
                     status: $data['status'],
                     borrowingRequestId: $updated->borrowing_request_id,
-                    remarks: $data['remarks'] ?? null,
+                    remarks: $remarks,
                 ));
             } catch (\Exception $e) {
                 \Log::error('Failed to send return status email: '.$e->getMessage());

@@ -65,9 +65,10 @@ class BorrowingManagementController extends Controller
         });
 
         $name = trim($updated->user?->first_name.' '.$updated->user?->last_name) ?: 'your request';
+        $remarks = $data['remarks'] ?? null;
         [$title, $message] = $data['status'] === 'Approved'
-            ? ['Borrowing Request Approved', "Good news, {$name}! Your borrowing request #{$updated->id} was approved.".($data['remarks'] ? ' Note: '.$data['remarks'] : '')]
-            : ['Borrowing Request Rejected', "Your borrowing request #{$updated->id} was rejected.".($data['remarks'] ? ' Reason: '.$data['remarks'] : '')];
+            ? ['Borrowing Request Approved', "Good news, {$name}! Your borrowing request #{$updated->id} was approved.".($remarks ? ' Note: '.$remarks : '')]
+            : ['Borrowing Request Rejected', "Your borrowing request #{$updated->id} was rejected.".($remarks ? ' Reason: '.$remarks : '')];
 
         Notification::create([
             'user_id' => $updated->user_id,
@@ -85,7 +86,7 @@ class BorrowingManagementController extends Controller
                     status: $data['status'],
                     requestId: $updated->id,
                     equipmentList: $equipmentList,
-                    remarks: $data['remarks'] ?? null,
+                    remarks: $remarks,
                 ));
             } catch (\Exception $e) {
                 \Log::error('Failed to send borrowing status email: '.$e->getMessage());

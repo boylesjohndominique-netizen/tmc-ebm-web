@@ -90,8 +90,8 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // Small realistic dataset (borrowers + borrowing/return requests)
-        // so the admin pages aren't empty. Remove if unwanted.
-        $this->call(DemoDataSeeder::class);
+        // Demo users/borrowings are intentionally NOT seeded anymore —
+        // accounts now come from real mobile registrations. Equipment and
+        // the super admin are still seeded above.
     }
 }

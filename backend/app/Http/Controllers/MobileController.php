@@ -45,32 +45,50 @@ class MobileController extends Controller
 
     /**
      * Submit a new borrowing request.
+     *
+     * The mobile app sends a single-item form; the payload is normalised
+     * into one borrowing request with one borrowing item. The student's
+     * purpose (and optional notes) is stored in `remarks`, which is the
+     * column the admin Borrowing/Return pages read and display.
      */
     public function submitBorrowRequest(Request $request)
     {
         $data = $request->validate([
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.equipment_id' => ['required', 'exists:equipment,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'equipment_id' => ['required', 'exists:equipment,id'],
+            'quantity' => ['required', 'integer', 'min:1'],
+            'borrowing_date' => ['required', 'date', 'after_or_equal:today'],
+            'expected_return_date' => ['required', 'date', 'after:borrowing_date'],
             'purpose' => ['required', 'string', 'max:500'],
-            'expected_return_date' => ['required', 'date', 'after:today'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $equipment = Equipment::findOrFail($data['equipment_id']);
+
+        if ($equipment->available_quantity < (int) $data['quantity']) {
+            return response()->json([
+                'message' => "Requested quantity exceeds availability for {$equipment->name}.",
+            ], 422);
+        }
+
+        $purpose = $data['purpose'];
+        $notes = $data['notes'] ?? null;
+
+        $remarks = $notes
+            ? $purpose.' — Notes: '.$notes
+            : $purpose;
+
         $borrowing = BorrowingRequest::create([
             'user_id' => $request->user()->id,
-            'purpose' => $data['purpose'],
+            'borrowing_date' => $data['borrowing_date'],
             'expected_return_date' => $data['expected_return_date'],
-            'notes' => $data['notes'] ?? null,
             'status' => 'Pending',
+            'remarks' => $remarks,
         ]);
 
-        foreach ($data['items'] as $item) {
-            $borrowing->items()->create([
-                'equipment_id' => $item['equipment_id'],
-                'quantity' => $item['quantity'],
-            ]);
-        }
+        $borrowing->items()->create([
+            'equipment_id' => $equipment->id,
+            'quantity' => (int) $data['quantity'],
+        ]);
 
         return response()->json([
             'message' => 'Borrowing request submitted successfully.',
@@ -79,12 +97,13 @@ class MobileController extends Controller
     }
 
     /**
-     * List the current user's borrowing requests.
+     * List the current user's borrowing requests, including any return
+     * requests so the app can show return status without extra calls.
      */
     public function myBorrowings(Request $request)
     {
         $borrowings = BorrowingRequest::where('user_id', $request->user()->id)
-            ->with('items.equipment')
+            ->with(['items.equipment.category', 'returns'])
             ->latest()
             ->get();
 
@@ -167,6 +186,14 @@ class MobileController extends Controller
             Notification::where('user_id', $request->user()->id)
                 ->latest()
                 ->get()
+                ->map(fn (Notification $n) => [
+                    'id' => $n->id,
+                    'title' => $n->title,
+                    'message' => $n->message,
+                    'type' => $n->type,
+                    'read_at' => $n->read_at?->toISOString(),
+                    'created_at' => $n->created_at?->toISOString(),
+                ])
         );
     }
 
@@ -177,7 +204,7 @@ class MobileController extends Controller
     {
         return response()->json([
             'count' => Notification::where('user_id', $request->user()->id)
-                ->where('is_read', false)
+                ->whereNull('read_at')
                 ->count(),
         ]);
     }
@@ -191,7 +218,7 @@ class MobileController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        $notification->update(['is_read' => true]);
+        $notification->update(['read_at' => now()]);
 
         return response()->json(['message' => 'Notification marked as read.']);
     }
@@ -202,8 +229,8 @@ class MobileController extends Controller
     public function markAllRead(Request $request)
     {
         Notification::where('user_id', $request->user()->id)
-            ->where('is_read', false)
-            ->update(['is_read' => true]);
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
 
         return response()->json(['message' => 'All notifications marked as read.']);
     }
