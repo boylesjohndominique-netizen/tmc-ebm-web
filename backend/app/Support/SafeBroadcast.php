@@ -18,6 +18,11 @@ class SafeBroadcast
 {
     public static function send(ShouldBroadcast $event): void
     {
+        // Don't broadcast during CLI operations (seeders, migrations, console commands)
+        if (app()->runningInConsole()) {
+            return;
+        }
+
         try {
             broadcast($event);
         } catch (Throwable $e) {

@@ -26,8 +26,8 @@ export default function ConnectionBadge() {
   }
 
   return (
-    <span className="conn-badge offline" title="Realtime updates offline — data refreshes on focus">
-      <WifiOff size={13} /> Offline
+    <span className="conn-badge offline" title="Realtime updates offline — data refreshes on page reload or focus">
+      <WifiOff size={13} /> Realtime: Off
     </span>
   );
 }

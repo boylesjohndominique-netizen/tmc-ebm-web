@@ -64,8 +64,8 @@ function createEcho() {
 
   return new Echo({
     broadcaster: 'reverb',
-    key: import.meta.env.VITE_REVERB_APP_KEY,
-    wsHost: import.meta.env.VITE_REVERB_HOST || window.location.hostname,
+    key: import.meta.env.VITE_REVERB_APP_KEY || 'tmc-equipment-local',
+    wsHost: import.meta.env.VITE_REVERB_HOST || window.location.hostname || '127.0.0.1',
     wsPort,
     wssPort: wsPort,
     forceTLS: wsScheme === 'https',
