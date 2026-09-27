@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\PasswordResetCodeMail;
+use App\Mail\VerificationCodeMail;
 use App\Models\Notification;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 /**
  * Authentication for the admin web system plus public student
@@ -18,9 +21,19 @@ use Illuminate\Support\Facades\Password;
  *   - Pending -> rejected until an admin verifies the account
  *   - Active  -> administrators may use the web system; other roles
  *                authenticate here to get an API token (mobile app)
+ *
+ * Mobile-specific endpoints:
+ *   - POST /api/mobile/login       — allows students to log in
+ *   - POST /api/verify-email       — verify the 6-digit email code
+ *   - POST /api/resend-verification — resend the 6-digit code
+ *   - POST /api/forgot-password    — send a 6-digit reset code
+ *   - POST /api/reset-password     — verify code + set new password
  */
 class AuthController extends Controller
 {
+    /**
+     * Web admin login (original behaviour — students blocked).
+     */
     public function login(Request $request)
     {
         $data = $request->validate([
@@ -87,8 +100,70 @@ class AuthController extends Controller
     }
 
     /**
+     * Mobile app login — students ARE allowed; staff/admin can use it too.
+     */
+    public function mobileLogin(Request $request)
+    {
+        $data = $request->validate([
+            'login' => ['required', 'string'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $user = User::where(function ($query) use ($data) {
+            $query->where('email', $data['login'])
+                ->orWhere('username', $data['login']);
+        })
+            ->with('role')
+            ->first();
+
+        if (!$user || !Hash::check($data['password'], $user->password)) {
+            return response()->json([
+                'message' => 'Invalid username/email or password.',
+            ], 422);
+        }
+
+        if ($user->isBanned()) {
+            return response()->json([
+                'message' => 'This account has been banned. '
+                    .'Please contact the college administrator.',
+            ], 403);
+        }
+
+        if ($user->isPending()) {
+            return response()->json([
+                'message' => 'Your account is still pending verification. '
+                    .'Please wait for an administrator to verify your registration.',
+            ], 403);
+        }
+
+        // Check if email is verified
+        if (!$user->email_verified_at) {
+            // Resend code if expired
+            $this->generateAndSendVerificationCode($user);
+
+            return response()->json([
+                'message' => 'Please verify your email address first. A new verification code has been sent.',
+                'requires_email_verification' => true,
+                'email' => $user->email,
+            ], 403);
+        }
+
+        $token = $user->createToken('tmc-mobile')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Login successful.',
+            'token' => $token,
+            'user' => [
+                ...$user->toArray(),
+                'role_name' => $user->role?->name,
+            ],
+        ]);
+    }
+
+    /**
      * Public self-registration (mobile app): creates a Pending Student
      * account that an administrator must verify before login is allowed.
+     * Sends a 6-digit email verification code.
      */
     public function register(Request $request)
     {
@@ -104,6 +179,8 @@ class AuthController extends Controller
 
         $studentRole = Role::where('name', 'Student')->firstOrFail();
 
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
         $user = User::create([
             'role_id' => $studentRole->id,
             'first_name' => $data['first_name'],
@@ -114,7 +191,21 @@ class AuthController extends Controller
             'contact_number' => $data['contact_number'] ?? null,
             'password' => $data['password'],
             'account_status' => 'Pending',
+            'email_verification_code' => $code,
+            'email_code_expires_at' => now()->addMinutes(15),
         ]);
+
+        // Send verification email with code and one-click verification link
+        try {
+            $verificationUrl = url('/verify-email-link?email=' . urlencode($user->email) . '&code=' . $code);
+            Mail::to($user->email)->send(new VerificationCodeMail(
+                code: $code,
+                userName: $user->first_name,
+                verificationUrl: $verificationUrl,
+            ));
+        } catch (\Exception $e) {
+            \Log::error('Failed to send verification email: '.$e->getMessage());
+        }
 
         // Notify every administrator so someone verifies the new account.
         $admins = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->get();
@@ -130,66 +221,153 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'message' => 'Registration successful. Your account is pending '
-                .'verification by an administrator.',
-            'user' => $user->load('role'),
+            'message' => 'Registration successful. A verification code has been sent to your email.',
+            'requires_email_verification' => true,
+            'email' => $user->email,
         ], 201);
     }
 
+    /**
+     * Verify email with the 6-digit code.
+     */
+    public function verifyEmail(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['required', 'string', 'size:6'],
+        ]);
+
+        $user = User::where('email', $data['email'])->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'No account found with this email.'], 404);
+        }
+
+        if ($user->email_verified_at) {
+            return response()->json(['message' => 'Email is already verified.']);
+        }
+
+        if ($user->email_verification_code !== $data['code']) {
+            return response()->json(['message' => 'Invalid verification code.'], 422);
+        }
+
+        if ($user->email_code_expires_at && $user->email_code_expires_at->isPast()) {
+            return response()->json(['message' => 'Verification code has expired. Please request a new one.'], 422);
+        }
+
+        $user->update([
+            'email_verified_at' => now(),
+            'email_verification_code' => null,
+            'email_code_expires_at' => null,
+        ]);
+
+        return response()->json([
+            'message' => 'Email verified successfully. Your account is pending admin verification.',
+        ]);
+    }
+
+    /**
+     * Resend the 6-digit email verification code.
+     */
+    public function resendVerification(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $user = User::where('email', $data['email'])->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'No account found with this email.'], 404);
+        }
+
+        if ($user->email_verified_at) {
+            return response()->json(['message' => 'Email is already verified.']);
+        }
+
+        $this->generateAndSendVerificationCode($user);
+
+        return response()->json([
+            'message' => 'A new verification code has been sent to your email.',
+        ]);
+    }
+
+    /**
+     * Send a 6-digit password reset code (mobile-friendly, no links).
+     */
     public function forgotPassword(Request $request)
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
         ]);
 
-        $status = Password::sendResetLink([
-            'email' => $data['email'],
-        ]);
+        $user = User::where('email', $data['email'])->first();
 
-        if ($status === Password::RESET_LINK_SENT) {
+        if (!$user) {
+            // Don't reveal whether the email exists
             return response()->json([
-                'message' => 'Password reset link sent successfully.',
+                'message' => 'If an account exists with this email, a reset code has been sent.',
             ]);
         }
 
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        $user->update([
+            'email_verification_code' => $code,
+            'email_code_expires_at' => now()->addMinutes(15),
+        ]);
+
+        try {
+            Mail::to($user->email)->send(new PasswordResetCodeMail(
+                code: $code,
+                userName: $user->first_name,
+            ));
+        } catch (\Exception $e) {
+            \Log::error('Failed to send password reset email: '.$e->getMessage());
+        }
+
         return response()->json([
-            'message' => 'Unable to send password reset link.',
-        ], 422);
+            'message' => 'If an account exists with this email, a reset code has been sent.',
+        ]);
     }
 
+    /**
+     * Reset password using the 6-digit code.
+     */
     public function resetPassword(Request $request)
     {
         $data = $request->validate([
-            'token' => ['required', 'string'],
             'email' => ['required', 'email'],
-            'password' => [
-                'required',
-                'string',
-                'min:8',
-                'confirmed',
-            ],
+            'code' => ['required', 'string', 'size:6'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $status = Password::reset(
-            $data,
-            function (User $user, string $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password),
-                ])->save();
+        $user = User::where('email', $data['email'])->first();
 
-                $user->tokens()->delete();
-            }
-        );
-
-        if ($status === Password::PASSWORD_RESET) {
-            return response()->json([
-                'message' => 'Password reset successfully.',
-            ]);
+        if (!$user) {
+            return response()->json(['message' => 'Invalid email or code.'], 422);
         }
 
+        if ($user->email_verification_code !== $data['code']) {
+            return response()->json(['message' => 'Invalid reset code.'], 422);
+        }
+
+        if ($user->email_code_expires_at && $user->email_code_expires_at->isPast()) {
+            return response()->json(['message' => 'Reset code has expired. Please request a new one.'], 422);
+        }
+
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+            'email_verification_code' => null,
+            'email_code_expires_at' => null,
+        ])->save();
+
+        // Revoke existing tokens for security
+        $user->tokens()->delete();
+
         return response()->json([
-            'message' => 'Invalid or expired password reset token.',
-        ], 422);
+            'message' => 'Password reset successfully. You can now log in with your new password.',
+        ]);
     }
 
     public function logout(Request $request)
@@ -210,5 +388,29 @@ class AuthController extends Controller
             'permission_map' => $user->permissionMap(),
             'is_super_admin' => $user->isSuperAdmin(),
         ]);
+    }
+
+    /**
+     * Generate and send a new 6-digit verification code.
+     */
+    private function generateAndSendVerificationCode(User $user): void
+    {
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        $user->update([
+            'email_verification_code' => $code,
+            'email_code_expires_at' => now()->addMinutes(15),
+        ]);
+
+        try {
+            $verificationUrl = url('/verify-email-link?email=' . urlencode($user->email) . '&code=' . $code);
+            Mail::to($user->email)->send(new VerificationCodeMail(
+                code: $code,
+                userName: $user->first_name,
+                verificationUrl: $verificationUrl,
+            ));
+        } catch (\Exception $e) {
+            \Log::error('Failed to send verification email: '.$e->getMessage());
+        }
     }
 }

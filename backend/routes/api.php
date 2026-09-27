@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\ReturnManagementController;
 use App\Http\Controllers\Admin\NotificationManagementController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\MobileController;
 
 
 /*
@@ -38,16 +39,41 @@ Route::post('/register', [
 
 
 // =====================================================
-// FORGOT PASSWORD ROUTES
+// EMAIL VERIFICATION ROUTES (PUBLIC)
 // =====================================================
 
-// Request password reset link
+Route::post('/verify-email', [
+    AuthController::class,
+    'verifyEmail'
+]);
+
+Route::post('/resend-verification', [
+    AuthController::class,
+    'resendVerification'
+]);
+
+
+// =====================================================
+// MOBILE APP LOGIN
+// =====================================================
+
+Route::post('/mobile/login', [
+    AuthController::class,
+    'mobileLogin'
+]);
+
+
+// =====================================================
+// FORGOT PASSWORD ROUTES (CODE-BASED FOR MOBILE)
+// =====================================================
+
+// Request password reset code
 Route::post('/forgot-password', [
     AuthController::class,
     'forgotPassword'
 ]);
 
-// Reset password using token
+// Reset password using code
 Route::post('/reset-password', [
     AuthController::class,
     'resetPassword'
@@ -298,3 +324,39 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
 });
+
+
+// =====================================================
+// MOBILE APP ROUTES (authenticated)
+// =====================================================
+
+Route::middleware('auth:sanctum')
+    ->prefix('mobile')
+    ->group(function () {
+
+        // Equipment
+        Route::get('/equipment', [MobileController::class, 'equipment']);
+        Route::get('/equipment/{equipment}', [MobileController::class, 'equipmentShow']);
+
+        // Borrowing
+        Route::post('/borrow', [MobileController::class, 'submitBorrowRequest']);
+        Route::get('/borrowings', [MobileController::class, 'myBorrowings']);
+        Route::put('/borrowings/{borrowing}/cancel', [MobileController::class, 'cancelBorrowing']);
+
+        // Returns
+        Route::post('/borrowings/{borrowing}/return', [MobileController::class, 'submitReturn']);
+
+        // Notifications
+        Route::get('/notifications', [MobileController::class, 'notifications']);
+        Route::get('/notifications/unread-count', [MobileController::class, 'unreadCount']);
+        Route::put('/notifications/{notification}/read', [MobileController::class, 'markRead']);
+        Route::put('/notifications/read-all', [MobileController::class, 'markAllRead']);
+
+        // Profile
+        Route::get('/profile', [MobileController::class, 'profile']);
+        Route::put('/profile', [MobileController::class, 'updateProfile']);
+        Route::put('/profile/password', [MobileController::class, 'changePassword']);
+
+        // Logout
+        Route::post('/logout', [AuthController::class, 'logout']);
+    });

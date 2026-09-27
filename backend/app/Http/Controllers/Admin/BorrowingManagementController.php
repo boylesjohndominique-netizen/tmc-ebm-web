@@ -2,11 +2,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\BorrowingStatusMail;
 use App\Models\BorrowingRequest;
 use App\Models\Equipment;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 
 class BorrowingManagementController extends Controller
@@ -73,6 +75,22 @@ class BorrowingManagementController extends Controller
             'message' => $message,
             'type' => $data['status'] === 'Approved' ? 'Success' : 'Request',
         ]);
+
+        // Send email notification
+        if ($updated->user?->email) {
+            $equipmentList = $updated->items->map(fn ($i) => $i->equipment?->name.' (×'.$i->quantity.')')->implode(', ');
+            try {
+                Mail::to($updated->user->email)->send(new BorrowingStatusMail(
+                    userName: trim($updated->user->first_name),
+                    status: $data['status'],
+                    requestId: $updated->id,
+                    equipmentList: $equipmentList,
+                    remarks: $data['remarks'] ?? null,
+                ));
+            } catch (\Exception $e) {
+                \Log::error('Failed to send borrowing status email: '.$e->getMessage());
+            }
+        }
 
         return response()->json([
             'message' => $data['status'] === 'Approved'

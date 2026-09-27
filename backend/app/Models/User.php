@@ -33,6 +33,9 @@ class User extends Authenticatable implements CanResetPassword
         'banned_at',
         'ban_reason',
         'is_super_admin',
+        'email_verified_at',
+        'email_verification_code',
+        'email_code_expires_at',
     ];
 
     protected $hidden = [
@@ -47,6 +50,8 @@ class User extends Authenticatable implements CanResetPassword
             'verified_at' => 'datetime',
             'banned_at' => 'datetime',
             'is_super_admin' => 'boolean',
+            'email_verified_at' => 'datetime',
+            'email_code_expires_at' => 'datetime',
         ];
     }
 

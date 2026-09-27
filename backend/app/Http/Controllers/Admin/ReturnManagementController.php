@@ -2,12 +2,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ReturnStatusMail;
 use App\Models\BorrowingRequest;
 use App\Models\Equipment;
 use App\Models\Notification;
 use App\Models\ReturnRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 
 class ReturnManagementController extends Controller
@@ -66,6 +68,20 @@ class ReturnManagementController extends Controller
             'message' => $message,
             'type' => $data['status'] === 'Confirmed' ? 'Success' : 'Request',
         ]);
+
+        // Send email notification
+        if ($updated->user?->email) {
+            try {
+                Mail::to($updated->user->email)->send(new ReturnStatusMail(
+                    userName: trim($updated->user->first_name),
+                    status: $data['status'],
+                    borrowingRequestId: $updated->borrowing_request_id,
+                    remarks: $data['remarks'] ?? null,
+                ));
+            } catch (\Exception $e) {
+                \Log::error('Failed to send return status email: '.$e->getMessage());
+            }
+        }
 
         return response()->json([
             'message' => $data['status'] === 'Confirmed'
