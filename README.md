@@ -1,6 +1,7 @@
 # TMC Equipment Borrowing and Tracking Management System
 
 Stack:
+
 - Laravel 12 REST API
 - Laravel Sanctum authentication
 - Laravel Reverb (WebSockets) — realtime updates, no manual refreshing
@@ -47,6 +48,7 @@ Frontend `http://localhost:5173`
 6. API runs at `http://127.0.0.1:8000`.
 
 Default administrator:
+
 - Username: `admin`
 - Password: `password123`
 
@@ -58,7 +60,7 @@ Change this password after testing.
 2. Run:
    - `npm install`
    - `npm run dev`
-3. Open the Vite URL, normally `http://localhost:5173`.
+3. Open the Vite URL, normally `http://localhost:5180`.
 
 If needed, copy `frontend/.env.example` to `frontend/.env` and keep:
 

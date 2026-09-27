@@ -21,7 +21,7 @@ cd "$(dirname "$0")"
 
 API_PORT="${TMC_API_PORT:-8000}"
 REVERB_PORT="${TMC_REVERB_PORT:-8080}"
-VITE_PORT="${TMC_VITE_PORT:-5173}"
+VITE_PORT="${TMC_VITE_PORT:-5180}"
 
 # ---- Preflight checks (fail early with a clear message) ----
 if ! command -v php >/dev/null 2>&1; then
