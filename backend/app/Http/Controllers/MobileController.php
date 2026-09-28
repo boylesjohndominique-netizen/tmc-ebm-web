@@ -64,6 +64,14 @@ class MobileController extends Controller
 
         $equipment = Equipment::findOrFail($data['equipment_id']);
 
+        // Guard: only admin-verified (Active) accounts may borrow.
+        if ($request->user()->isPending()) {
+            return response()->json([
+                'message' => 'Your account has not been verified by an administrator yet. '
+                    .'Please submit your ID photos in the Profile screen and wait for approval.',
+            ], 403);
+        }
+
         if ($equipment->available_quantity < (int) $data['quantity']) {
             return response()->json([
                 'message' => "Requested quantity exceeds availability for {$equipment->name}.",

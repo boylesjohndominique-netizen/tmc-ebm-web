@@ -133,12 +133,8 @@ class AuthController extends Controller
             ], 403);
         }
 
-        if ($user->isPending()) {
-            return response()->json([
-                'message' => 'Your account is still pending verification. '
-                    .'Please wait for an administrator to verify your registration.',
-            ], 403);
-        }
+        // Note: Pending students CAN log in and browse, but they cannot borrow
+        // until an administrator verifies their uploaded ID photos.
 
         // Check if email is verified
         if (!$user->email_verified_at) {
@@ -160,6 +156,8 @@ class AuthController extends Controller
             'user' => [
                 ...$user->toArray(),
                 'role_name' => $user->role?->name,
+                'account_status' => $user->account_status,
+                'is_id_verified' => $user->isActive(),
             ],
         ]);
     }
@@ -265,8 +263,20 @@ class AuthController extends Controller
             'email_code_expires_at' => null,
         ]);
 
+        // Auto-login: issue a token so the mobile app can navigate straight to
+        // the dashboard without requiring a second manual login step.
+        $token = $user->createToken('tmc-mobile')->plainTextToken;
+        $user->load('role');
+
         return response()->json([
-            'message' => 'Email verified successfully. Your account is pending admin verification.',
+            'message' => 'Email verified successfully. Welcome!',
+            'token' => $token,
+            'user' => [
+                ...$user->toArray(),
+                'role_name' => $user->role?->name,
+                'account_status' => $user->account_status,
+                'is_id_verified' => $user->isActive(),
+            ],
         ]);
     }
 
