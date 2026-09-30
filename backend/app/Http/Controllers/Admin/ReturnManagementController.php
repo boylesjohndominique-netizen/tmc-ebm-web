@@ -67,7 +67,7 @@ class ReturnManagementController extends Controller
             'user_id' => $updated->user_id,
             'title' => $title,
             'message' => $message,
-            'type' => $data['status'] === 'Confirmed' ? 'Success' : 'Request',
+            'type' => 'Return',
         ]);
 
         // Send email notification

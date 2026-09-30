@@ -1,11 +1,15 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, ClipboardList, RotateCcw, History, Bell, User, Users, BarChart3, ShieldCheck, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Package, ClipboardList, RotateCcw, Bell, User, Users, BarChart3, ShieldCheck, LogOut, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 /**
  * Sidebar directory: [route, label, icon, module].
  * The module key is checked against the signed-in user's permissions;
  * links to modules they cannot view are hidden entirely.
+ *
+ * Transaction History deliberately has no entry here — it lives inside
+ * the Reports page ("Transaction Audit" report) and a standalone page
+ * would duplicate it.
  */
 const adminLinks = [
   ['/admin', 'Dashboard', LayoutDashboard, 'dashboard'],
@@ -13,7 +17,6 @@ const adminLinks = [
   ['/admin/equipment', 'Equipment', Package, 'equipment'],
   ['/admin/borrowing-requests', 'Borrowing Requests', ClipboardList, 'borrowings'],
   ['/admin/return-requests', 'Return Requests', RotateCcw, 'returns'],
-  ['/admin/transaction-history', 'Transaction History', History, 'transactions'],
   ['/admin/notifications', 'Notifications', Bell, 'notifications'],
   ['/admin/reports', 'Reports', BarChart3, 'reports'],
 ];

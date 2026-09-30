@@ -1161,6 +1161,56 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   margin-bottom: 5px;
 }
 
+/* ---- Verification ID photos (Users detail modal) ---- */
+.id-photo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.id-photo {
+  margin: 0;
+}
+
+.id-photo figcaption {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--faint);
+  margin-bottom: 6px;
+}
+
+.id-photo img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--blue-ghost);
+  box-shadow: var(--shadow-xs);
+}
+
+.id-photo-empty {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 11px;
+  border: 1px dashed var(--border);
+  background: var(--blue-ghost);
+  color: var(--faint);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  padding: 10px;
+}
+
+[data-theme="dark"] .id-photo img,
+[data-theme="dark"] .id-photo-empty { background: var(--raised); }
+[data-theme="dark"] .id-photo img { border-color: var(--border); }
+
 /* =========================================================
    NOTIFICATIONS — inbox + compose
    ========================================================= */
@@ -1379,6 +1429,32 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: var(--blue-ghost);
   color: var(--muted);
   box-shadow: inset 0 0 0 1px var(--border-soft);
+}
+
+/* Event-specific chips (Borrow/Return/Verification/Registration/Account).
+   Colors reuse the design-system tokens so both themes stay readable. */
+.notif-icon.return {
+  background: linear-gradient(145deg, var(--warning-soft), transparent);
+  color: var(--warning);
+  box-shadow: inset 0 0 0 1px rgba(148, 98, 0, .14);
+}
+
+.notif-icon.verification {
+  background: linear-gradient(145deg, var(--blue-light), var(--blue-ghost));
+  color: var(--blue-strong);
+  box-shadow: inset 0 0 0 1px rgba(11, 78, 162, .14);
+}
+
+.notif-icon.registration {
+  background: linear-gradient(145deg, var(--yellow-light), transparent);
+  color: var(--yellow-deep);
+  box-shadow: inset 0 0 0 1px rgba(255, 216, 61, .24);
+}
+
+.notif-icon.account {
+  background: linear-gradient(145deg, var(--danger-soft), transparent);
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px rgba(180, 35, 24, .14);
 }
 
 .notif-body { min-width: 0; flex: 1; }
@@ -2673,6 +2749,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 [data-theme="dark"] .notif-search { background: var(--raised); }
 [data-theme="dark"] .notif-search input { color: var(--text); }
 [data-theme="dark"] .notif-icon.system { background: rgba(91, 155, 255, .07); }
+[data-theme="dark"] .notif-icon.return { background: rgba(255, 216, 61, .07); }
+[data-theme="dark"] .notif-icon.verification { background: rgba(91, 155, 255, .12); }
+[data-theme="dark"] .notif-icon.registration { background: rgba(255, 216, 61, .1); }
+[data-theme="dark"] .notif-icon.account { background: rgba(255, 107, 89, .1); }
+[data-theme="dark"] .notif-icon.verification svg { color: var(--blue-strong); }
+[data-theme="dark"] .notif-icon.registration svg { color: var(--yellow-deep); }
 [data-theme="dark"] .notif-stat-icon.unread { color: var(--yellow); }
 [data-theme="dark"] .row-icon-btn { background: var(--raised); border-color: var(--border); }
 [data-theme="dark"] .row-icon-btn:hover { background: var(--success-soft); }

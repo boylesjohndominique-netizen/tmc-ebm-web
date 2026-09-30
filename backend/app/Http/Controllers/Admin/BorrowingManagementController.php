@@ -74,7 +74,7 @@ class BorrowingManagementController extends Controller
             'user_id' => $updated->user_id,
             'title' => $title,
             'message' => $message,
-            'type' => $data['status'] === 'Approved' ? 'Success' : 'Request',
+            'type' => 'Borrow',
         ]);
 
         // Send email notification

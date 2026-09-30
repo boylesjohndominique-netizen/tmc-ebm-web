@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BellRing, Send, Search, Check, CheckCheck, ClipboardList,
   CheckCircle2, Settings2, RotateCcw, Inbox, Lock, X,
+  ShieldCheck, UserPlus, Ban,
 } from 'lucide-react';
 import api from '../../services/api';
 import { useNotifications } from '../../context/NotificationContext';
@@ -13,15 +14,25 @@ import useRealtimeResource from '../../hooks/useRealtimeResource';
 
 const emptyForm = { user_id: '', title: '', message: '', type: 'System' };
 
-/* Type → icon chip styling used in list rows and stat cards */
+/*
+ * Notification type vocabulary — the backend tags every event with the
+ * action that caused it (Borrow/Return/Verification/Registration/Account),
+ * so the inbox can show the right icon and let staff filter by event kind.
+ * Request/Success/System remain for older rows and manual broadcasts.
+ */
 const TYPES = {
-  Request: { icon: ClipboardList, cls: 'request' },
-  Success: { icon: CheckCircle2, cls: 'success' },
-  System:  { icon: Settings2,  cls: 'system' },
+  Borrow:       { icon: ClipboardList,  cls: 'request' },
+  Return:       { icon: RotateCcw,      cls: 'return' },
+  Verification: { icon: ShieldCheck,    cls: 'verification' },
+  Registration: { icon: UserPlus,       cls: 'registration' },
+  Account:      { icon: Ban,            cls: 'account' },
+  Request:      { icon: ClipboardList,  cls: 'request' },
+  Success:      { icon: CheckCircle2,   cls: 'success' },
+  System:       { icon: Settings2,      cls: 'system' },
 };
 const typeMeta = t => TYPES[t] || TYPES.System;
 
-const FILTERS = ['all', 'unread', 'Request', 'Success', 'System'];
+const FILTERS = ['all', 'unread', 'Borrow', 'Return', 'Verification', 'Registration', 'Account', 'Request', 'Success', 'System'];
 const filterLabel = f =>
   f === 'all' ? 'All' : f === 'unread' ? 'Unread' : f;
 
@@ -91,17 +102,21 @@ export default function Notifications() {
     }
   };
 
-  /* Derived: counts for the stat cards + filtered list */
-  const counts = useMemo(() => ({
-    total: items.length,
-    unread: items.filter(x => !x.read_at).length,
-    Request: items.filter(x => (x.type || 'System') === 'Request').length,
-    Success: items.filter(x => (x.type || 'System') === 'Success').length,
-    System: items.filter(x => (x.type || 'System') === 'System').length,
-  }), [items]);
+  /* Derived: counts for the stat cards + filtered list.
+     Unknown/legacy types are counted under System so totals always add up. */
+  const counts = useMemo(() => {
+    const byType = {};
+    for (const x of items) {
+      const t = TYPES[x.type] ? x.type : 'System';
+      byType[t] = (byType[t] || 0) + 1;
+    }
+    byType.total = items.length;
+    byType.unread = items.filter(x => !x.read_at).length;
+    return byType;
+  }, [items]);
 
   const filtered = useMemo(() => items.filter(x => {
-    const type = x.type || 'System';
+    const type = TYPES[x.type] ? x.type : 'System';
     if (tab === 'unread' && x.read_at) return false;
     if (tab !== 'all' && tab !== 'unread' && type !== tab) return false;
     if (query) {
@@ -128,11 +143,27 @@ export default function Notifications() {
         </div>
         <div className="notif-stat">
           <div className="notif-stat-icon request"><ClipboardList size={20} /></div>
-          <div><b className="notif-stat-value">{counts.Request}</b><span className="notif-stat-label">Requests</span></div>
+          <div><b className="notif-stat-value">{counts.Borrow || 0}</b><span className="notif-stat-label">Borrow</span></div>
+        </div>
+        <div className="notif-stat">
+          <div className="notif-stat-icon return"><RotateCcw size={20} /></div>
+          <div><b className="notif-stat-value">{counts.Return || 0}</b><span className="notif-stat-label">Returns</span></div>
+        </div>
+        <div className="notif-stat">
+          <div className="notif-stat-icon verification"><ShieldCheck size={20} /></div>
+          <div><b className="notif-stat-value">{counts.Verification || 0}</b><span className="notif-stat-label">Verification</span></div>
+        </div>
+        <div className="notif-stat">
+          <div className="notif-stat-icon registration"><UserPlus size={20} /></div>
+          <div><b className="notif-stat-value">{counts.Registration || 0}</b><span className="notif-stat-label">Registrations</span></div>
+        </div>
+        <div className="notif-stat">
+          <div className="notif-stat-icon account"><Ban size={20} /></div>
+          <div><b className="notif-stat-value">{counts.Account || 0}</b><span className="notif-stat-label">Account</span></div>
         </div>
         <div className="notif-stat">
           <div className="notif-stat-icon success"><CheckCircle2 size={20} /></div>
-          <div><b className="notif-stat-value">{counts.Success}</b><span className="notif-stat-label">Success</span></div>
+          <div><b className="notif-stat-value">{counts.Success || 0}</b><span className="notif-stat-label">Success</span></div>
         </div>
       </div>
 

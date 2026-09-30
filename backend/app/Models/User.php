@@ -36,6 +36,9 @@ class User extends Authenticatable implements CanResetPassword
         'email_verified_at',
         'email_verification_code',
         'email_code_expires_at',
+        'id_front_path',
+        'id_back_path',
+        'id_submitted_at',
     ];
 
     protected $hidden = [
@@ -52,6 +55,7 @@ class User extends Authenticatable implements CanResetPassword
             'is_super_admin' => 'boolean',
             'email_verified_at' => 'datetime',
             'email_code_expires_at' => 'datetime',
+            'id_submitted_at' => 'datetime',
         ];
     }
 
@@ -134,6 +138,12 @@ class User extends Authenticatable implements CanResetPassword
      | Lifecycle: a student self-registers as Pending, an admin
      | verifies them -> Active, and may later ban -> Banned.
      | Staff/faculty/admin created by the super admin start Active.
+     |
+     | Verification and ban status are INDEPENDENT dimensions:
+     | `verified_at` records whether an admin approved the account,
+     | while `account_status` only tracks access (Active/Banned).
+     | Banning must never change verification, and unbanning must
+     | restore exactly the pre-ban state.
      */
 
     public const STATUSES = ['Pending', 'Active', 'Banned'];
@@ -142,6 +152,24 @@ class User extends Authenticatable implements CanResetPassword
     public function isActive(): bool  { return $this->account_status === 'Active'; }
     public function isBanned(): bool  { return $this->account_status === 'Banned'; }
     public function isStudent(): bool { return $this->role?->name === 'Student'; }
+
+    /**
+     * Whether an administrator has approved this account's verification.
+     * Driven solely by `verified_at` — independent of `account_status`,
+     * so ban/unban can never alter it.
+     *
+     * Students are verified explicitly via the verify endpoint. Staff,
+     * faculty and admin accounts are provisioned trusted by the Super
+     * Admin (no verification step), so they count as verified.
+     */
+    public function isIdVerified(): bool
+    {
+        if (!$this->isStudent()) {
+            return true;
+        }
+
+        return $this->verified_at !== null;
+    }
 
     public function verifier(): BelongsTo
     {

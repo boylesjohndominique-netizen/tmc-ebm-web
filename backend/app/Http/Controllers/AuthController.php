@@ -120,9 +120,23 @@ class AuthController extends Controller
             ->with('role')
             ->first();
 
-        if (!$user || !Hash::check($data['password'], $user->password)) {
+        // Give the student a specific reason instead of one generic message.
+        // Note: the rest of this API already distinguishes account states
+        // (banned/pending/no-account on the verification endpoints), and
+        // registration reveals which emails/usernames are taken, so this
+        // does not introduce a new class of user enumeration. The web admin
+        // login (/login) intentionally keeps its generic message.
+        if (!$user) {
             return response()->json([
-                'message' => 'Invalid username/email or password.',
+                'message' => 'Username/email not found. Please check your username or email.',
+                'error' => 'account_not_found',
+            ], 422);
+        }
+
+        if (!Hash::check($data['password'], $user->password)) {
+            return response()->json([
+                'message' => 'Incorrect password. Please try again.',
+                'error' => 'incorrect_password',
             ], 422);
         }
 
@@ -157,7 +171,10 @@ class AuthController extends Controller
                 ...$user->toArray(),
                 'role_name' => $user->role?->name,
                 'account_status' => $user->account_status,
-                'is_id_verified' => $user->isActive(),
+                // Verification is tracked by verified_at, independent of the
+                // ban lifecycle — a banned-then-unbanned student stays exactly
+                // as verified as they were before the ban.
+                'is_id_verified' => $user->isIdVerified(),
             ],
         ]);
     }
@@ -218,7 +235,7 @@ class AuthController extends Controller
                 'title' => 'New Student Registration',
                 'message' => "{$user->first_name} {$user->last_name} (@{$user->username}) "
                     .'registered as a student and is awaiting verification.',
-                'type' => 'Request',
+                'type' => 'Registration',
             ]);
         }
 
@@ -275,7 +292,7 @@ class AuthController extends Controller
                 ...$user->toArray(),
                 'role_name' => $user->role?->name,
                 'account_status' => $user->account_status,
-                'is_id_verified' => $user->isActive(),
+                'is_id_verified' => $user->isIdVerified(),
             ],
         ]);
     }

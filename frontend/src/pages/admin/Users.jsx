@@ -1,6 +1,6 @@
-import {useCallback,useEffect,useState} from 'react';
+import { useCallback,useEffect,useState} from 'react';
 import { Link } from 'react-router-dom';
-import { Ban, CheckCircle2, Eye, Pencil, RotateCcw, ShieldBan, Trash2, UserPlus, UsersRound } from 'lucide-react';
+import { Ban, CheckCircle2, Eye, IdCard, Pencil, RotateCcw, ShieldBan, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import api from '../../services/api';
 import Modal from '../../components/Modal';
 import SearchBar from '../../components/SearchBar';
@@ -14,6 +14,44 @@ import StatusBadge from '../../components/StatusBadge';
 
 const emptyForm = {first_name:'',middle_name:'',last_name:'',role:'Faculty',username:'',email:'',contact_number:'',password:''};
 const STATUS_FILTERS = ['All','Pending','Active','Banned'];
+
+/*
+ * One submitted ID photo (front|back). The image is streamed from the
+ * backend's private storage through the authorized admin endpoint (Bearer
+ * auth), so it is never publicly reachable. Missing/failed loads show a
+ * graceful fallback instead of a broken image.
+ */
+function IdPhoto({ userId, side }) {
+  const [failed, setFailed] = useState(false);
+
+  // Bearer tokens can't be sent via <img>, so fetch the image with the
+  // auth header and hand the blob to the <img> element.
+  const [blobUrl, setBlobUrl] = useState(null);
+  useEffect(() => {
+    let revoked = false;
+    setBlobUrl(null);
+    setFailed(false);
+    api.get(`/admin/users/${userId}/id-photo/${side}`, { responseType: 'blob' })
+      .then(r => {
+        if (!revoked) setBlobUrl(URL.createObjectURL(r.data));
+      })
+      .catch(() => { if (!revoked) setFailed(true); });
+    return () => { revoked = true; };
+  }, [userId, side]);
+
+  useEffect(() => () => { if (blobUrl) URL.revokeObjectURL(blobUrl); }, [blobUrl]);
+
+  return (
+    <figure className="id-photo">
+      <figcaption>{side === 'front' ? 'Front ID' : 'Back ID'}</figcaption>
+      {failed
+        ? <div className="id-photo-empty"><IdCard size={22} /><span>No ID photo submitted</span></div>
+        : blobUrl
+          ? <img src={blobUrl} alt={`${side} ID`} onError={() => setFailed(true)} />
+          : <div className="id-photo-empty"><span>Loading…</span></div>}
+    </figure>
+  );
+}
 
 export default function Users(){
   const { can } = useAuth();
@@ -180,14 +218,28 @@ export default function Users(){
           <div className="detail-list">
             <div><b>Role</b>{detail.user.role?.name}</div>
             <div><b>Status</b><StatusBadge status={detail.user.account_status}/></div>
+            {/* Verification is shown independently of ban status — banning
+                never revokes it and unbanning never grants it. */}
+            <div><b>ID Verified</b>{detail.user.is_id_verified ? 'Yes' : 'No'}</div>
             <div><b>Username</b>{detail.user.username}</div>
             <div><b>Email</b>{detail.user.email}</div>
             <div><b>Contact Number</b>{detail.user.contact_number||'—'}</div>
             <div><b>Registered</b>{fmtDate(detail.user.created_at)}</div>
-            {detail.user.verified_at&&<div><b>Verified</b>{fmtDateTime(detail.user.verified_at)}</div>}
+            {detail.user.verified_at&&<div><b>Verified At</b>{fmtDateTime(detail.user.verified_at)}</div>}
+            {detail.user.id_submitted_at&&<div><b>ID Submitted</b>{fmtDateTime(detail.user.id_submitted_at)}</div>}
             {detail.user.banned_at&&<div><b>Banned</b>{fmtDateTime(detail.user.banned_at)}</div>}
             {detail.user.ban_reason&&<div><b>Ban Reason</b>{detail.user.ban_reason}</div>}
           </div>
+
+          {/* Submitted verification ID photos (front + back), streamed from
+              private storage through the authorized admin endpoint. */}
+          <h3>Verification ID</h3>
+          {detail.user.id_submitted_at
+            ? <div className="id-photo-grid">
+                <IdPhoto userId={detail.user.id} side="front" />
+                <IdPhoto userId={detail.user.id} side="back" />
+              </div>
+            : <div className="id-photo-grid"><div className="id-photo-empty"><IdCard size={22} /><span>No ID submitted</span></div></div>}
           <div className="detail-list">
             <div><b>Total Requests</b>{stat('total_requests')??0}</div>
             <div><b>Pending</b>{stat('pending_requests')??0}</div>

@@ -38,7 +38,11 @@ class UserManagementController extends Controller
         $borrowed = BorrowingRequest::where('user_id', $user->id)->where('status', 'Approved')->with('items.equipment')->get();
 
         return response()->json([
-            'user' => $user->load('role'),
+            'user' => array_merge($user->load('role')->toArray(), [
+                // Verification marker, independent of account/ban status so
+                // the admin UI can show the two dimensions separately.
+                'is_id_verified' => $user->isIdVerified(),
+            ]),
             'statistics' => [
                 'total_requests' => BorrowingRequest::where('user_id', $user->id)->count(),
                 'pending_requests' => BorrowingRequest::where('user_id', $user->id)->where('status', 'Pending')->count(),
@@ -122,6 +126,7 @@ class UserManagementController extends Controller
             return response()->json(['message' => 'Only pending accounts can be verified.'], 422);
         }
 
+        // Verification only ever happens here — ban/unban must not touch it.
         $user->update([
             'account_status' => 'Active',
             'verified_at' => now(),
@@ -132,7 +137,7 @@ class UserManagementController extends Controller
             'user_id' => $user->id,
             'title' => 'Account Verified',
             'message' => 'Your account has been verified. You can now log in to the mobile app.',
-            'type' => 'System',
+            'type' => 'Success',
         ]);
 
         return response()->json([
@@ -175,7 +180,7 @@ class UserManagementController extends Controller
             'user_id' => $user->id,
             'title' => 'Account Banned',
             'message' => 'Your account has been banned. Reason: '.$data['reason'],
-            'type' => 'System',
+            'type' => 'Account',
         ]);
 
         return response()->json([
@@ -185,7 +190,12 @@ class UserManagementController extends Controller
     }
 
     /**
-     * Lift a ban and restore the account to Active.
+     * Lift a ban and restore the account's pre-ban status.
+     *
+     * A banned account keeps whatever verification it had before the ban:
+     * a previously verified account becomes Active again, while an account
+     * that was never verified returns to Pending (it must still be verified
+     * before it can borrow). Unbanning NEVER marks an account verified.
      */
     public function unban(Request $request, User $user)
     {
@@ -193,8 +203,9 @@ class UserManagementController extends Controller
             return response()->json(['message' => 'This account is not banned.'], 422);
         }
 
+        // `verified_at` is untouched, so verification survives the ban cycle.
         $user->update([
-            'account_status' => 'Active',
+            'account_status' => $user->isIdVerified() ? 'Active' : 'Pending',
             'banned_at' => null,
             'ban_reason' => null,
         ]);
@@ -203,13 +214,35 @@ class UserManagementController extends Controller
             'user_id' => $user->id,
             'title' => 'Ban Lifted',
             'message' => 'Your account has been reinstated. You can log in again.',
-            'type' => 'System',
+            'type' => 'Account',
         ]);
 
         return response()->json([
             'message' => 'Account unbanned successfully.',
             'user' => $user->fresh()->load('role'),
         ]);
+    }
+
+    /**
+     * Stream a submitted ID photo (front|back) from the private disk.
+     *
+     * Images are never publicly reachable — this authorized endpoint is the
+     * only way to view them, and it 404s gracefully when nothing was
+     * submitted or the file is missing.
+     */
+    public function idPhoto(Request $request, User $user, string $side)
+    {
+        if (!in_array($side, ['front', 'back'], true)) {
+            return response()->json(['message' => 'Unknown ID side.'], 404);
+        }
+
+        $path = $side === 'front' ? $user->id_front_path : $user->id_back_path;
+
+        if (!$path || !\Storage::disk('local')->exists($path)) {
+            return response()->json(['message' => 'No ID photo submitted.'], 404);
+        }
+
+        return response()->file(\Storage::disk('local')->path($path));
     }
 
     public function destroy(Request $request, User $user)

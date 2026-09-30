@@ -23,7 +23,6 @@ const Users = lazy(() => import("./pages/admin/Users"));
 const AdminEquipment = lazy(() => import("./pages/admin/Equipment"));
 const BorrowingRequests = lazy(() => import("./pages/admin/BorrowingRequests"));
 const ReturnRequests = lazy(() => import("./pages/admin/ReturnRequests"));
-const TransactionHistory = lazy(() => import("./pages/admin/TransactionHistory"));
 const AdminNotifications = lazy(() => import("./pages/admin/Notifications"));
 const AdminProfile = lazy(() => import("./pages/admin/Profile"));
 const Reports = lazy(() => import("./pages/admin/Reports"));
@@ -228,15 +227,9 @@ export default function App() {
             }
           />
 
-          {/* Transaction History (processed requests audit) */}
-          <Route
-            path="/admin/transaction-history"
-            element={
-              <RequirePerm module="transactions">
-                <TransactionHistory />
-              </RequirePerm>
-            }
-          />
+          {/* Transaction History lives inside Reports (Transaction Audit
+              report) — the former standalone page/route was removed as a
+              duplicate. The /admin/transactions API stays; Reports uses it. */}
 
           {/* Admin Notifications */}
           <Route

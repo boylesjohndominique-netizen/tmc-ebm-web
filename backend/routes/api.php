@@ -219,6 +219,13 @@ Route::middleware('auth:sanctum')->group(function () {
                 'unban'
             ])->middleware('perm:users.ban');
 
+            // View a student's submitted ID photos (private disk, streamed to
+            // authorized staff only — images are never publicly reachable).
+            Route::get('/users/{user}/id-photo/{side}', [
+                UserManagementController::class,
+                'idPhoto'
+            ])->middleware('perm:users.view');
+
 
             // Equipment
             Route::get('/equipment/{equipment}', [
@@ -356,6 +363,10 @@ Route::middleware('auth:sanctum')
         Route::get('/profile', [MobileController::class, 'profile']);
         Route::put('/profile', [MobileController::class, 'updateProfile']);
         Route::put('/profile/password', [MobileController::class, 'changePassword']);
+
+        // ID verification (private storage; admin review via the Users page)
+        Route::post('/id-verification', [MobileController::class, 'submitIdVerification']);
+        Route::get('/id-photo/{side}', [MobileController::class, 'myIdPhoto'])->where('side', 'front|back');
 
         // Logout
         Route::post('/logout', [AuthController::class, 'logout']);
