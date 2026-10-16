@@ -190,10 +190,12 @@ export default function Notifications() {
           </div>
 
           <div className="notif-toolbar">
-            <div className="segmented-tabs">
+            <div className="segmented-tabs" role="tablist" aria-label="Filter notifications">
               {FILTERS.map(f => (
                 <button
                   key={f}
+                  role="tab"
+                  aria-selected={tab === f}
                   className={tab === f ? 'active' : ''}
                   onClick={() => setTab(f)}
                 >

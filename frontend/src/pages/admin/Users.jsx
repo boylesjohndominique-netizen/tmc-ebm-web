@@ -1,6 +1,6 @@
 import { useCallback,useEffect,useState} from 'react';
 import { Link } from 'react-router-dom';
-import { Ban, CheckCircle2, Eye, IdCard, Pencil, RotateCcw, ShieldBan, Trash2, UserPlus, UsersRound } from 'lucide-react';
+import { Ban, CheckCircle2, Eye, EyeOff, IdCard, Pencil, RotateCcw, ShieldBan, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import api from '../../services/api';
 import Modal from '../../components/Modal';
 import SearchBar from '../../components/SearchBar';
@@ -63,6 +63,7 @@ export default function Users(){
   const [detail,setDetail]=useState(null);      // full info object from /admin/users/{id}
   const [editing,setEditing]=useState(null);    // user object being edited
   const [adding,setAdding]=useState(false);
+  const [showPassword,setShowPassword]=useState(false); // show/hide password in the add/edit modal
   const [form,setForm]=useState(emptyForm);
   const [banning,setBanning]=useState(null);    // user being banned
   const [banReason,setBanReason]=useState('');
@@ -86,7 +87,7 @@ export default function Users(){
 
   const openEdit=(x,fromDetail=false)=>{ setError(''); setForm({first_name:x.first_name,middle_name:x.middle_name||'',last_name:x.last_name,role:x.role?.name||'Faculty',username:x.username,email:x.email,contact_number:x.contact_number||'',password:''}); setEditing(x); if(fromDetail) setDetail(null); // avoid stacking the view + edit modals
   };
-  const closeAll=()=>{ setDetail(null); setEditing(null); setAdding(false); setBanning(null); setBanReason(''); setForm(emptyForm); setError(''); };
+  const closeAll=()=>{ setDetail(null); setEditing(null); setAdding(false); setBanning(null); setBanReason(''); setForm(emptyForm); setError(''); setShowPassword(false); };
 
   const save=async e=>{
     e.preventDefault(); setBusy(true); setError('');
@@ -165,7 +166,7 @@ export default function Users(){
   const clearSearchFilters=()=>{setSearch('');setRoleFilter('All');};
 
   return <>
-    <div className="page-heading"><div><h1>User Management</h1><p>Manage staff accounts, verify student registrations, and moderate access.</p></div>{can('users','create')&&<button className="btn btn-primary" onClick={()=>{setForm(emptyForm);setAdding(true)}}><UserPlus size={16}/> Add User</button>}</div>
+    <div className="page-heading"><div><h1>User Management</h1><p>Manage staff accounts, verify student registrations, and moderate access.</p></div>{can('users','create')&&<button className="btn btn-primary" onClick={()=>{setForm(emptyForm);setShowPassword(false);setAdding(true)}}><UserPlus size={16}/> Add User</button>}</div>
     {notice&&<div className="alert success">{notice}</div>}
     {error&&!detail&&!editing&&!adding&&!banning&&<div className="alert error">{error}</div>}
 
@@ -209,7 +210,7 @@ export default function Users(){
     {loading&&!error&&<div className="panel"><Skeleton rows={5} /></div>}
     {!loading&&!filtered.length&&!error&&(hasSearchFilters
       ?<EmptyState icon={UsersRound} title="No matching users" message="No users match your search or role filter. Try different keywords or clear the filters." action={{label:'Clear Filters',onClick:clearSearchFilters}}/>
-      :<EmptyState icon={UsersRound} title={statusFilter==='All'?'No users found':`No ${statusFilter.toLowerCase()} users`} message={statusFilter==='Pending'?'Student registrations awaiting verification will appear here.':'Registered accounts will appear here.'} action={statusFilter==='All'?{label:'Add User',onClick:()=>{setForm(emptyForm);setAdding(true)}}:null}/>)}
+      :<EmptyState icon={UsersRound} title={statusFilter==='All'?'No users found':`No ${statusFilter.toLowerCase()} users`} message={statusFilter==='Pending'?'Student registrations awaiting verification will appear here.':'Registered accounts will appear here.'} action={statusFilter==='All'?{label:'Add User',onClick:()=>{setForm(emptyForm);setShowPassword(false);setAdding(true)}}:null}/>)}
 
     {/* ---- View user info ---- */}
     <Modal open={!!detail} title={`User — ${detail?.user?.first_name} ${detail?.user?.last_name}`} onClose={closeAll}>
@@ -301,7 +302,14 @@ export default function Users(){
             <label>Username<input value={form.username} onChange={e=>setForm({...form,username:e.target.value})} required/></label>
             <label>Email<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required/></label>
             <label>Contact Number<input value={form.contact_number} onChange={e=>setForm({...form,contact_number:e.target.value})}/></label>
-            <label>{editing?'New Password (optional)':'Password'}<input type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} minLength="8" required={!editing} placeholder={editing?'Leave blank to keep current':''}/></label>
+            <label>{editing?'New Password (optional)':'Password'}
+              <div className="password-field">
+                <input type={showPassword?'text':'password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} minLength="8" required={!editing} autoComplete="new-password" placeholder={editing?'Leave blank to keep current':''}/>
+                <button type="button" className="password-toggle" title={showPassword?'Hide password':'Show password'} aria-label={showPassword?'Hide password':'Show password'} onClick={()=>setShowPassword(v=>!v)}>
+                  {showPassword?<EyeOff size={15}/>:<Eye size={15}/>}
+                </button>
+              </div>
+            </label>
           </div>
         </div>
         {error&&<div className="alert error">{error}</div>}

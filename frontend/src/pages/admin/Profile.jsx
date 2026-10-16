@@ -1,5 +1,5 @@
 import { useEffect,useState } from 'react';
-import { KeyRound, Save, UserRound } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, Save, UserRound } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -12,6 +12,7 @@ export default function Profile(){
   const [user,setUser]=useState(null);
   const [form,setForm]=useState({first_name:'',middle_name:'',last_name:'',email:'',contact_number:''});
   const [pw,setPw]=useState({current_password:'',password:'',password_confirmation:''});
+  const [showPw,setShowPw]=useState(false); // show/hide the password fields
   const [msg,setMsg]=useState(''); const [error,setError]=useState('');
   const [pwMsg,setPwMsg]=useState(''); const [pwError,setPwError]=useState('');
   const [busy,setBusy]=useState(false);
@@ -85,9 +86,30 @@ export default function Profile(){
         {pwMsg&&<div className="alert success">{pwMsg}</div>}
         {pwError&&<div className="alert error">{pwError}</div>}
         <form onSubmit={changePassword}>
-          <label>Current Password<input type="password" value={pw.current_password} onChange={e=>setPw({...pw,current_password:e.target.value})} required autoComplete="current-password"/></label>
-          <label>New Password<input type="password" value={pw.password} onChange={e=>setPw({...pw,password:e.target.value})} required minLength="8" autoComplete="new-password"/></label>
-          <label>Confirm New Password<input type="password" value={pw.password_confirmation} onChange={e=>setPw({...pw,password_confirmation:e.target.value})} required minLength="8" autoComplete="new-password"/></label>
+          <label>Current Password
+            <div className="password-field">
+              <input type={showPw?'text':'password'} value={pw.current_password} onChange={e=>setPw({...pw,current_password:e.target.value})} required autoComplete="current-password"/>
+              <button type="button" className="password-toggle" title={showPw?'Hide password':'Show password'} aria-label={showPw?'Hide password':'Show password'} onClick={()=>setShowPw(v=>!v)}>
+                {showPw?<EyeOff size={15}/>:<Eye size={15}/>}
+              </button>
+            </div>
+          </label>
+          <label>New Password
+            <div className="password-field">
+              <input type={showPw?'text':'password'} value={pw.password} onChange={e=>setPw({...pw,password:e.target.value})} required minLength="8" autoComplete="new-password"/>
+              <button type="button" className="password-toggle" title={showPw?'Hide password':'Show password'} aria-label={showPw?'Hide password':'Show password'} onClick={()=>setShowPw(v=>!v)}>
+                {showPw?<EyeOff size={15}/>:<Eye size={15}/>}
+              </button>
+            </div>
+          </label>
+          <label>Confirm New Password
+            <div className="password-field">
+              <input type={showPw?'text':'password'} value={pw.password_confirmation} onChange={e=>setPw({...pw,password_confirmation:e.target.value})} required minLength="8" autoComplete="new-password"/>
+              <button type="button" className="password-toggle" title={showPw?'Hide password':'Show password'} aria-label={showPw?'Hide password':'Show password'} onClick={()=>setShowPw(v=>!v)}>
+                {showPw?<EyeOff size={15}/>:<Eye size={15}/>}
+              </button>
+            </div>
+          </label>
           <button className="btn btn-primary" disabled={busy}><KeyRound size={16}/> Change Password</button>
         </form>
       </section>

@@ -15,9 +15,12 @@ cd /d "%~dp0"
 
 echo Starting TMC Equipment System development services...
 
-start "TMC API - artisan serve"      cmd /k "cd backend && php artisan serve"
+start "TMC API - artisan serve"      cmd /k "cd backend && php artisan serve --host=0.0.0.0 --port=8000"
 start "TMC WebSockets - reverb"      cmd /k "cd backend && php artisan reverb:start"
 start "TMC Frontend - vite dev"      cmd /k "cd frontend && npm run dev"
+
+adb reverse tcp:8000 tcp:8000 >nul 2>&1
+adb reverse tcp:8080 tcp:8080 >nul 2>&1
 
 echo.
 echo   API         : http://127.0.0.1:8000
