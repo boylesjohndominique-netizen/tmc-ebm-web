@@ -1,64 +1,46 @@
-# Laravel
-/backend/.env
-
-/backend/storage/*
-/backend/storage/framework/*
-/backend/storage/logs/*
-/backend/bootstrap/cache/*
-
-# Keep required Laravel directories
-!/backend/storage/
-!/backend/storage/app/
-!/backend/storage/framework/
-!/backend/storage/framework/cache/
-!/backend/storage/framework/sessions/
-!/backend/storage/framework/testing/
-!/backend/storage/framework/views/
-!/backend/storage/logs/
-
-# Laravel environment
-/backend/.env
-
-# Laravel generated/runtime files
-/backend/storage/*
-/backend/bootstrap/cache/*
-
-# Frontend dependencies
-/frontend/node_modules/
-
-# Frontend build output
-/frontend/dist/
-/frontend/build/
-
-# Laravel environment
-/backend/.env
-
-# Laravel runtime/generated files
-/backend/storage/*
-/backend/bootstrap/cache/*
-
 # =========================
-# Laravel
+# Laravel (backend/)
 # =========================
-
 /backend/.env
-
+/backend/.env.*
+!/backend/.env.example
 /backend/vendor/
-/backend/storage/*
+
+# Keep the directory tree, ignore all generated runtime contents
+/backend/storage/**/*
+!/backend/storage/**/
+!/backend/storage/**/.gitignore
+!/backend/storage/**/.gitkeep
+
 /backend/bootstrap/cache/*
+!/backend/bootstrap/cache/.gitignore
+/backend/public/storage
+/backend/public/hot
 
 # =========================
-# Frontend
+# Frontend (frontend/)
 # =========================
-
 /frontend/node_modules/
 /frontend/dist/
 /frontend/build/
+/frontend/.vite/
+
+/frontend/.env
+/frontend/.env.*
+!/frontend/.env.example
+
+/frontend/*.log
 
 # =========================
-# Environment files
+# Environment files & general
 # =========================
-
 .env
 .env.local
 .env.*.local
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.swp
