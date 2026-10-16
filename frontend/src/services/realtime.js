@@ -29,8 +29,9 @@ export const REALTIME_EVENTS = Object.freeze({
   NOTIFICATION: 'notification',
 });
 
-const wsScheme = import.meta.env.VITE_REVERB_SCHEME || 'http';
-const wsPort = Number(import.meta.env.VITE_REVERB_PORT || 8080);
+const isSecureContext = window.location.protocol === 'https:';
+const wsScheme = import.meta.env.VITE_REVERB_SCHEME || (isSecureContext ? 'https' : 'http');
+const wsPort = Number(import.meta.env.VITE_REVERB_PORT || (isSecureContext ? 443 : 8080));
 
 function notifyState(status) {
   stateListeners.forEach((fn) => {
