@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
-  ArrowRight,
+  ArrowLeft,
+  CheckCircle,
   Eye,
   EyeOff,
   LockKeyhole,
@@ -10,12 +11,10 @@ import {
   Mail,
   ShieldCheck,
   User,
-  KeyRound,
-  ArrowLeft,
-  CheckCircle,
 } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
+import ThemeToggle from "../../components/ThemeToggle";
 
 export default function Login() {
   // Forgot password mode
@@ -173,10 +172,11 @@ export default function Login() {
 
   return (
     <main className="auth-page">
+      <ThemeToggle />
       <section className="auth-shell">
 
         {/* ======================================
-            LEFT SIDE
+            LEFT SIDE — brand panel
         ====================================== */}
 
         <aside className="auth-intro">
@@ -184,16 +184,16 @@ export default function Login() {
           <div className="auth-brand-row">
 
             <div className="auth-logo">
-              TMC
+              <img src="/logo.png" alt="Trinidad Municipal College" />
             </div>
 
             <div>
               <strong>
-                TRINIDAD MUNICIPAL COLLEGE
+                Trinidad Municipal College
               </strong>
 
               <span>
-                College Equipment Services
+                Equipment Services
               </span>
             </div>
 
@@ -202,42 +202,37 @@ export default function Login() {
           <div className="auth-intro-content">
 
             <span className="auth-kicker">
-              WEB-BASED MANAGEMENT SYSTEM
+              Equipment Management
             </span>
 
             <h1>
-              Equipment Borrowing
+              Borrow.
               <br />
-              &amp; Tracking
+              Track.
+              <br />
+              Return.
             </h1>
 
             <p>
-              A centralized web system for requesting,
-              monitoring, returning, and managing
-              college equipment.
+              Requests, returns, and records —
+              all in one place.
             </p>
 
             <div className="auth-feature-list">
 
               <div>
-                <ShieldCheck size={19} />
-                <span>
-                  Secure role-based access
-                </span>
+                <ShieldCheck size={17} />
+                <span>Secure</span>
               </div>
 
               <div>
-                <ArrowRight size={19} />
-                <span>
-                  Simple borrowing workflow
-                </span>
+                <LockKeyhole size={17} />
+                <span>Private</span>
               </div>
 
               <div>
-                <LockKeyhole size={19} />
-                <span>
-                  Organized transaction records
-                </span>
+                <CheckCircle size={17} />
+                <span>Tracked</span>
               </div>
 
             </div>
@@ -250,16 +245,12 @@ export default function Login() {
               © {new Date().getFullYear()} Trinidad Municipal College
             </span>
 
-            <span>
-              Equipment Borrowing &amp; Tracking Management System
-            </span>
-
           </div>
 
         </aside>
 
         {/* ======================================
-            RIGHT SIDE
+            RIGHT SIDE — form
         ====================================== */}
 
         <section className="auth-form-area">
@@ -267,7 +258,7 @@ export default function Login() {
           <div className="auth-form-card">
 
             {/* ==================================
-                FORGOT PASSWORD FORM
+                FORGOT PASSWORD
             ================================== */}
 
             {forgotMode ? (
@@ -276,22 +267,14 @@ export default function Login() {
 
                 <div className="auth-form-heading">
 
-                  <span className="auth-form-icon">
-                    <KeyRound size={22} />
-                  </span>
+                  <h2>
+                    Reset Password
+                  </h2>
 
-                  <div>
-
-                    <h2>
-                      Forgot Password?
-                    </h2>
-
-                    <p>
-                      Enter your registered email
-                      to reset your password.
-                    </p>
-
-                  </div>
+                  <p>
+                    Enter your email and we'll
+                    send a reset link.
+                  </p>
 
                 </div>
 
@@ -313,15 +296,18 @@ export default function Login() {
                   className="auth-form"
                 >
 
-                  <label>
+                  <div className="auth-field">
 
-                    Registered Email
+                    <label htmlFor="auth-forgot-email">
+                      Registered Email
+                    </label>
 
                     <div className="input-with-icon">
 
                       <Mail size={18} />
 
                       <input
+                        id="auth-forgot-email"
                         type="email"
                         name="forgotEmail"
                         value={forgotEmail}
@@ -335,14 +321,7 @@ export default function Login() {
 
                     </div>
 
-                  </label>
-
-                  <p className="forgot-password-help">
-                    Enter the email address associated
-                    with your TMC account. If the account
-                    exists, you will receive instructions
-                    to reset your password.
-                  </p>
+                  </div>
 
                   <button
                     className="btn btn-primary auth-submit"
@@ -353,7 +332,7 @@ export default function Login() {
                     <Mail size={18} />
 
                     {busy
-                      ? "Sending Reset Link…"
+                      ? "Sending…"
                       : "Send Reset Link"}
 
                   </button>
@@ -388,22 +367,14 @@ export default function Login() {
 
                 <div className="auth-form-heading">
 
-                  <span className="auth-form-icon">
-                    <LogIn size={22} />
-                  </span>
+                  <h2>
+                    Welcome Back
+                  </h2>
 
-                  <div>
-
-                    <h2>
-                      Welcome Back
-                    </h2>
-
-                    <p>
-                      Sign in to access the admin
-                      dashboard.
-                    </p>
-
-                  </div>
+                  <p>
+                    Sign in to continue to the
+                    admin dashboard.
+                  </p>
 
                 </div>
 
@@ -424,15 +395,18 @@ export default function Login() {
                   className="auth-form"
                 >
 
-                  <label>
+                  <div className="auth-field">
 
-                    Username or Email
+                    <label htmlFor="auth-login">
+                      Username or Email
+                    </label>
 
                     <div className="input-with-icon">
 
                       <User size={18} />
 
                       <input
+                        id="auth-login"
                         name="login"
                         value={loginForm.login}
                         onChange={updateLogin}
@@ -443,17 +417,32 @@ export default function Login() {
 
                     </div>
 
-                  </label>
+                  </div>
 
-                  <label>
+                  <div className="auth-field">
 
-                    Password
+                    <div className="field-head">
+
+                      <label htmlFor="auth-password">
+                        Password
+                      </label>
+
+                      <button
+                        type="button"
+                        className="text-button auth-inline-link"
+                        onClick={openForgotPassword}
+                      >
+                        Forgot password?
+                      </button>
+
+                    </div>
 
                     <div className="password-field input-with-icon">
 
                       <LockKeyhole size={18} />
 
                       <input
+                        id="auth-password"
                         type={
                           showPassword
                             ? "text"
@@ -492,22 +481,6 @@ export default function Login() {
 
                     </div>
 
-                  </label>
-
-                  <div className="auth-options">
-
-                    <span>
-                      Use your registered TMC admin account.
-                    </span>
-
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={openForgotPassword}
-                    >
-                      Forgot Password?
-                    </button>
-
                   </div>
 
                   <button
@@ -523,6 +496,14 @@ export default function Login() {
                       : "Sign In"}
 
                   </button>
+
+                  <p className="auth-form-note">
+
+                    <ShieldCheck size={15} />
+
+                    Authorized personnel only
+
+                  </p>
 
                 </form>
 

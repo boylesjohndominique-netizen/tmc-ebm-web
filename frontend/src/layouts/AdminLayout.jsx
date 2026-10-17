@@ -24,7 +24,7 @@ export default function AdminLayout() {
       {/* Brand icon — its own floating chip at the top-left, above the rail
           and separate from the navbar; taps through to the Dashboard. */}
       <NavLink to="/admin" className="nav-brand" aria-label="Dashboard">
-        <div className="brand-mark">TMC</div>
+        <div className="brand-mark"><img src="/logo.png" alt="TMCEBMS" /></div>
       </NavLink>
       <Sidebar open={open} onClose={() => setOpen(false)} />
       <button
