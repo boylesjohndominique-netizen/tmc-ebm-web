@@ -1,13 +1,16 @@
 <?php
 namespace App\Http\Controllers\Admin;
 
+use App\Events\UserBanned;
 use App\Http\Controllers\Controller;
 use App\Models\BorrowingRequest;
 use App\Models\Notification;
 use App\Models\ReturnRequest;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\SafeBroadcast;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -182,6 +185,13 @@ class UserManagementController extends Controller
             'message' => 'Your account has been banned. Reason: '.$data['reason'],
             'type' => 'Account',
         ]);
+
+        // Push the ban to the user's private channel. A mobile app that is
+        // still open shows the ban notice + appeal form and signs out — the
+        // socket survives even though the API token was just revoked.
+        DB::afterCommit(function () use ($user, $data) {
+            SafeBroadcast::send(new UserBanned($user->id, $data['reason']));
+        });
 
         return response()->json([
             'message' => 'Account banned successfully.',

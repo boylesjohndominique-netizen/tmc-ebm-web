@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\ReturnManagementController;
 use App\Http\Controllers\Admin\NotificationManagementController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\AppealController;
 use App\Http\Controllers\MobileController;
 
 
@@ -61,6 +62,16 @@ Route::post('/mobile/login', [
     AuthController::class,
     'mobileLogin'
 ]);
+
+
+// =====================================================
+// BAN APPEAL (PUBLIC — banned users have no valid token)
+// =====================================================
+
+Route::post('/appeals', [
+    AppealController::class,
+    'store'
+])->middleware('throttle:5,1');
 
 
 // =====================================================

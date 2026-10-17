@@ -144,6 +144,9 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'This account has been banned. '
                     .'Please contact the college administrator.',
+                'error' => 'account_banned',
+                'banned' => true,
+                'ban_reason' => $user->ban_reason,
             ], 403);
         }
 
