@@ -87,3 +87,10 @@ export function isOverdue(expectedReturn, status) {
   today.setHours(0, 0, 0, 0);
   return d.getTime() < today.getTime();
 }
+
+/** 12.5 → "₱12.50" — peso amounts (overdue fees, etc.). */
+export function fmtCurrency(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '₱0.00';
+  return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(n);
+}

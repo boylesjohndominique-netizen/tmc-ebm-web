@@ -9,6 +9,7 @@ import Skeleton from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
 import useRealtimeResource from '../../hooks/useRealtimeResource';
+import { fmtCurrency } from '../../utils/datetime';
 
 export default function ReturnRequests() {
   const { can } = useAuth();
@@ -89,7 +90,7 @@ export default function ReturnRequests() {
           {hasFilters && <button className="btn btn-secondary small" onClick={clearFilters}>Clear</button>}
         </div>
         <div className="table-wrap"><table>
-          <thead><tr><th>ID</th><th>User</th><th>Borrowing</th><th>Condition</th><th>Status</th><th>Action</th></tr></thead>
+          <thead><tr><th>ID</th><th>User</th><th>Borrowing</th><th>Condition</th><th>Overdue Fee</th><th>Status</th><th>Action</th></tr></thead>
           <tbody>
             {filtered.map(x => (
               <tr key={x.id}>
@@ -97,6 +98,7 @@ export default function ReturnRequests() {
                 <td>{x.user?.first_name} {x.user?.last_name}</td>
                 <td>#{x.borrowing_request_id}</td>
                 <td>{x.condition_on_return || '—'}</td>
+                <td>{x.overdue_fee > 0 ? `${fmtCurrency(x.overdue_fee)} · ${x.overdue_days}d` : '—'}</td>
                 <td><StatusBadge status={x.status} /></td>
                 <td>
                   {x.status === 'Pending' && can('returns', 'process') && <>
@@ -107,7 +109,7 @@ export default function ReturnRequests() {
                 </td>
               </tr>
             ))}
-            {!filtered.length && <tr className="empty"><td colSpan="6">No return requests match your filters.</td></tr>}
+            {!filtered.length && <tr className="empty"><td colSpan="7">No return requests match your filters.</td></tr>}
           </tbody>
         </table></div>
         </>

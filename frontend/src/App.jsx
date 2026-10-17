@@ -27,6 +27,7 @@ const AdminNotifications = lazy(() => import("./pages/admin/Notifications"));
 const AdminProfile = lazy(() => import("./pages/admin/Profile"));
 const Reports = lazy(() => import("./pages/admin/Reports"));
 const Permissions = lazy(() => import("./pages/admin/Permissions"));
+const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 
 function PageFallback() {
   return (
@@ -257,6 +258,16 @@ export default function App() {
             element={
               <RequirePerm module="permissions" action="manage">
                 <Permissions />
+              </RequirePerm>
+            }
+          />
+
+          {/* System Settings (overdue fee, etc.) */}
+          <Route
+            path="/admin/settings"
+            element={
+              <RequirePerm module="settings">
+                <AdminSettings />
               </RequirePerm>
             }
           />

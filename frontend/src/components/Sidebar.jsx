@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, ClipboardList, RotateCcw, Bell, Users, BarChart3, ShieldCheck, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Package, ClipboardList, RotateCcw, Bell, Users, BarChart3, ShieldCheck, Settings, LogOut, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -21,6 +21,7 @@ const adminLinks = [
   ['/admin/return-requests', 'Return Requests', RotateCcw, 'returns'],
   ['/admin/notifications', 'Notifications', Bell, 'notifications'],
   ['/admin/reports', 'Reports', BarChart3, 'reports'],
+  ['/admin/settings', 'Settings', Settings, 'settings'],
 ];
 
 function initials(name = '') {
