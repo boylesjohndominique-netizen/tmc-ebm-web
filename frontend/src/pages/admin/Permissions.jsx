@@ -6,6 +6,7 @@ import Skeleton from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import StatusBadge from '../../components/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import useRealtimeResource from '../../hooks/useRealtimeResource';
 
 /**
@@ -18,6 +19,7 @@ import useRealtimeResource from '../../hooks/useRealtimeResource';
  */
 export default function Permissions() {
   const { refreshUser } = useAuth();
+  const confirm = useConfirm();
   const [catalog, setCatalog] = useState([]); // [{key,label,description,actions}]
   const [users, setUsers] = useState([]);
   const [selected, setSelected] = useState(null); // user object from index
@@ -94,7 +96,12 @@ export default function Permissions() {
   };
 
   const resetToDefaults = async () => {
-    if (!confirm(`Reset all permissions for ${selected.first_name} ${selected.last_name} to their role defaults?`)) return;
+    if (!await confirm({
+      title: 'Reset permissions?',
+      message: `Reset all permissions for ${selected.first_name} ${selected.last_name} to their role defaults?`,
+      confirmLabel: 'Reset to Defaults',
+      tone: 'danger',
+    })) return;
     setBusy(true); setError(''); setNotice('');
     try {
       const { data } = await api.put(`/admin/permissions/${selected.id}/reset`);

@@ -5,6 +5,7 @@ import api from '../../services/api';
 import Modal from '../../components/Modal';
 import SearchBar from '../../components/SearchBar';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
 import useRealtimeResource from '../../hooks/useRealtimeResource';
 import { fmtDate, fmtDateTime, fmtDateRange } from '../../utils/datetime';
@@ -55,6 +56,7 @@ function IdPhoto({ userId, side }) {
 
 export default function Users(){
   const { can } = useAuth();
+  const confirm = useConfirm();
   const [items,setItems]=useState([]);
   const [statusFilter,setStatusFilter]=useState('All');
   const [search,setSearch]=useState('');      // input value — updates instantly as you type
@@ -102,6 +104,11 @@ export default function Users(){
   /* ---------- Account status actions ---------- */
 
   const verify=async x=>{
+    if(!await confirm({
+      title:'Verify account?',
+      message:`Approve ${x.first_name} ${x.last_name}'s registration and grant them access?`,
+      confirmLabel:'Verify Account',
+    })) return;
     setBusy(true); setError('');
     try{ const r=await api.put(`/admin/users/${x.id}/verify`); setNotice(r.data.message||'Account verified.'); setDetail(null); load(); }
     catch(err){ setError(err.response?.data?.message||'Unable to verify account.'); }
@@ -117,6 +124,11 @@ export default function Users(){
   };
 
   const unban=async x=>{
+    if(!await confirm({
+      title:'Lift ban?',
+      message:`Restore ${x.first_name} ${x.last_name}'s access? They will be able to sign in again.`,
+      confirmLabel:'Lift Ban',
+    })) return;
     setBusy(true); setError('');
     try{ const r=await api.put(`/admin/users/${x.id}/unban`); setNotice(r.data.message||'Account unbanned.'); setDetail(null); load(); }
     catch(err){ setError(err.response?.data?.message||'Unable to unban account.'); }
@@ -124,11 +136,21 @@ export default function Users(){
   };
 
   const del=async x=>{
-    if(!confirm(`Delete user ${x.first_name} ${x.last_name}?`))return;
+    if(!await confirm({
+      title:'Delete user?',
+      message:`Permanently delete ${x.first_name} ${x.last_name}? This cannot be undone.`,
+      confirmLabel:'Delete User',
+      tone:'danger',
+    }))return;
     try{ await api.delete(`/admin/users/${x.id}`); setNotice('User deleted.'); load(); }
     catch(err){
       if(err.response?.data?.requires_force){
-        if(confirm('This user has borrowing/return history. Deleting them permanently removes those records too. Continue?')){
+        if(await confirm({
+          title:'Delete user and records?',
+          message:'This user has borrowing/return history. Deleting them permanently removes those records too. Continue?',
+          confirmLabel:'Delete Permanently',
+          tone:'danger',
+        })){
           try{ await api.delete(`/admin/users/${x.id}?force=1`); setNotice('User and their records deleted.'); load(); }
           catch(e2){ setError(e2.response?.data?.message||'Unable to delete user.'); }
         }

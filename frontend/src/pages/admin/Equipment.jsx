@@ -4,6 +4,7 @@ import api from '../../services/api';
 import Modal from '../../components/Modal';
 import SearchBar from '../../components/SearchBar';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
 import useRealtimeResource from '../../hooks/useRealtimeResource';
 
@@ -11,6 +12,7 @@ const emptyForm={category_id:'',name:'',description:'',quantity:1,condition:'Goo
 
 export default function Equipment(){
   const { can } = useAuth();
+  const confirm = useConfirm();
   const [items,setItems]=useState([]);
   const [cats,setCats]=useState([]);
   const [editing,setEditing]=useState(null); // null = closed, 'new' = adding, object = editing
@@ -59,13 +61,20 @@ export default function Equipment(){
   };
 
   const del=async x=>{
-    if(!confirm(`Delete ${x.name}?`))return;
+    if(!await confirm({
+      title:'Delete equipment?',
+      message:`Permanently remove "${x.name}"? This cannot be undone.`,
+      confirmLabel:'Delete Equipment',
+      tone:'danger',
+    }))return;
+    setError('');
     try{ await api.delete(`/admin/equipment/${x.id}`); load(); }
-    catch(err){ alert(err.response?.data?.message||'Unable to delete equipment.'); }
+    catch(err){ setError(err.response?.data?.message||'Unable to delete equipment.'); }
   };
 
   return <>
     <div className="page-heading"><div><h1>Equipment Management</h1><p>Add, update, or remove college equipment.</p></div>{can('equipment','create')&&<button className="btn btn-primary" onClick={openNew}><Plus size={16}/> Add Equipment</button>}</div>
+    {error&&!editing&&<div className="alert error">{error}</div>}
 
     {/* ---- Search & filters ---- */}
     <div className="toolbar">

@@ -3,12 +3,14 @@ import { Eye, EyeOff, KeyRound, Save, UserRound } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import Skeleton from '../../components/Skeleton';
 import { fmtDate } from '../../utils/datetime';
 
 export default function Profile(){
   const { refreshUser } = useAuth();
   const { refresh } = useNotifications(); // keeps the polling alive while token context changes
+  const confirm = useConfirm();
   const [user,setUser]=useState(null);
   const [form,setForm]=useState({first_name:'',middle_name:'',last_name:'',email:'',contact_number:''});
   const [pw,setPw]=useState({current_password:'',password:'',password_confirmation:''});
@@ -35,6 +37,12 @@ export default function Profile(){
     e.preventDefault(); setPwMsg(''); setPwError('');
     if(pw.password!==pw.password_confirmation){ setPwError('New passwords do not match.'); return; }
     if(pw.password===pw.current_password){ setPwError('The new password must be different from the current password.'); return; }
+    if(!await confirm({
+      title:'Change password?',
+      message:'Your password will be updated immediately. You will keep your current session.',
+      confirmLabel:'Change Password',
+      tone:'danger',
+    })) return;
     setBusy(true);
     try{
       await api.put('/profile/password',pw);

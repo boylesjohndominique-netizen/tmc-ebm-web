@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Package, ClipboardList, RotateCcw, Bell, Users, BarChart3, ShieldCheck, LogOut, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 /**
  * Sidebar directory: [route, label, icon, module].
@@ -37,9 +38,19 @@ function initials(name = '') {
 export default function Sidebar({ open, onClose }) {
   const { logout, can, isSuperAdmin, user } = useAuth();
   const { unread } = useNotifications();
+  const confirm = useConfirm();
 
   const visible = adminLinks.filter(([, , , module]) => can(module, 'view'));
   const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '?';
+
+  const handleLogout = async () => {
+    if (await confirm({
+      title: 'Log out?',
+      message: 'You will need to sign in again to access the admin panel.',
+      confirmLabel: 'Log Out',
+      tone: 'danger',
+    })) logout();
+  };
 
   return (
     <aside className={`sidebar ${open ? 'open' : ''}`} aria-label="Main navigation">
@@ -81,7 +92,7 @@ export default function Sidebar({ open, onClose }) {
         <span className="nav-name">Profile</span>
       </NavLink>
 
-      <button className="logout-link nav-tip" data-label="Logout" onClick={logout}>
+      <button className="logout-link nav-tip" data-label="Logout" onClick={handleLogout}>
         <LogOut size={19} />
         <span className="nav-name">Logout</span>
       </button>

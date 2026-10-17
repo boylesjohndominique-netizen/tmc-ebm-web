@@ -7,6 +7,7 @@ import {
 import api from '../../services/api';
 import { useNotifications } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import Skeleton from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import { timeAgo, fmtDateTime } from '../../utils/datetime';
@@ -38,6 +39,7 @@ const filterLabel = f =>
 
 export default function Notifications() {
   const { can } = useAuth();
+  const confirm = useConfirm();
   const { unread, refresh } = useNotifications();
   const [users, setUsers] = useState([]);
   const [items, setItems] = useState([]);
@@ -76,6 +78,11 @@ export default function Notifications() {
   };
 
   const markAllRead = async () => {
+    if (!await confirm({
+      title: 'Mark all as read?',
+      message: `Mark all ${counts.unread} unread notification${counts.unread === 1 ? '' : 's'} as read?`,
+      confirmLabel: 'Mark All Read',
+    })) return;
     setItems(list => list.map(x => (x.read_at ? x : { ...x, read_at: new Date().toISOString() })));
     try {
       await api.put('/notifications/read-all');
@@ -87,6 +94,12 @@ export default function Notifications() {
 
   const send = async e => {
     e.preventDefault();
+    const recipient = users.find(x => String(x.id) === String(form.user_id));
+    if (!await confirm({
+      title: 'Send notification?',
+      message: `Send "${form.title}" to ${recipient ? `${recipient.first_name} ${recipient.last_name}` : 'the selected user'}?`,
+      confirmLabel: 'Send',
+    })) return;
     setBusy(true);
     setMsg('');
     setError('');
@@ -100,6 +113,16 @@ export default function Notifications() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const resetForm = async () => {
+    if (!await confirm({
+      title: 'Clear form?',
+      message: 'Discard the drafted notification? Any unsaved content will be lost.',
+      confirmLabel: 'Clear',
+      tone: 'danger',
+    })) return;
+    setForm({ ...emptyForm });
   };
 
   /* Derived: counts for the stat cards + filtered list.
@@ -346,7 +369,7 @@ export default function Notifications() {
                 </label>
 
                 <div className="compose-actions">
-                  <button type="button" className="btn btn-danger" onClick={() => setForm({ ...emptyForm })} disabled={busy || (!form.title && !form.message && !form.user_id)}>
+                  <button type="button" className="btn btn-danger" onClick={resetForm} disabled={busy || (!form.title && !form.message && !form.user_id)}>
                     <RotateCcw size={15} /> Reset
                   </button>
                   <button className="btn btn-primary" disabled={busy}>
