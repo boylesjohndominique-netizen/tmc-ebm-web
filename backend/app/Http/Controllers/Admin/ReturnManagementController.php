@@ -7,6 +7,7 @@ use App\Models\BorrowingRequest;
 use App\Models\Equipment;
 use App\Models\Notification;
 use App\Models\ReturnRequest;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -40,19 +41,33 @@ class ReturnManagementController extends Controller
             $borrowing = $returnRequest->borrowing()->with('items.equipment')->lockForUpdate()->firstOrFail();
             $items = $borrowing->items;
 
+            $attributes = [
+                'status' => $data['status'],
+                'remarks' => $data['remarks'] ?? $returnRequest->remarks,
+                'processed_by' => auth()->id(),
+            ];
+
             if ($data['status'] === 'Confirmed') {
                 foreach ($items as $item) {
                     Equipment::whereKey($item->equipment_id)->increment('available_quantity', $item->quantity);
                 }
 
                 $borrowing->update(['status' => 'Completed']);
+
+                // Freeze the overdue fee: full calendar days between the
+                // expected and actual return dates, at the admin-configured
+                // daily rate. Same-day/early returns owe nothing.
+                $expected = $borrowing->expected_return_date->copy()->startOfDay();
+                $actual = now()->startOfDay();
+                $overdueDays = max(0, (int) $expected->diffInDays($actual, false));
+                $rate = (float) Setting::get(Setting::OVERDUE_FEE_PER_DAY, 0);
+
+                $attributes['returned_at'] = now();
+                $attributes['overdue_days'] = $overdueDays;
+                $attributes['overdue_fee'] = round($overdueDays * $rate, 2);
             }
 
-            $returnRequest->update([
-                'status' => $data['status'],
-                'remarks' => $data['remarks'] ?? $returnRequest->remarks,
-                'processed_by' => auth()->id(),
-            ]);
+            $returnRequest->update($attributes);
 
             return $returnRequest;
         });
@@ -62,6 +77,14 @@ class ReturnManagementController extends Controller
         [$title, $message] = $data['status'] === 'Confirmed'
             ? ['Return Confirmed', "Thanks, {$name}! Your return for request #{$updated->borrowing_request_id} has been confirmed."]
             : ['Return Rejected', "Your return for request #{$updated->borrowing_request_id} was rejected.".($remarks ? ' Reason: '.$remarks : '')];
+
+        if ($data['status'] === 'Confirmed' && (float) $updated->overdue_fee > 0) {
+            $message .= sprintf(
+                ' This return was %d day(s) late, so an overdue fee of ₱%s applies.',
+                $updated->overdue_days,
+                number_format((float) $updated->overdue_fee, 2)
+            );
+        }
 
         Notification::create([
             'user_id' => $updated->user_id,

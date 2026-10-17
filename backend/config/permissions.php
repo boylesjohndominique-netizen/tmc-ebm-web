@@ -60,6 +60,12 @@ return [
             'description' => 'Printable summary and audit reports.',
             'actions' => ['view'],
         ],
+
+        'settings' => [
+            'label' => 'System Settings',
+            'description' => 'Configure overdue fees and other system-wide options.',
+            'actions' => ['view', 'update'],
+        ],
     ],
 
     /**

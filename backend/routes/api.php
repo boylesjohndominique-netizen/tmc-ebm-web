@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\ReturnManagementController;
 use App\Http\Controllers\Admin\NotificationManagementController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\AppealController;
 use App\Http\Controllers\MobileController;
 
@@ -301,6 +302,18 @@ Route::middleware('auth:sanctum')->group(function () {
                 ReportController::class,
                 'index'
             ])->middleware('perm:reports.view');
+
+
+            // System Settings (overdue fee, etc.)
+            Route::get('/settings', [
+                SettingController::class,
+                'index'
+            ])->middleware('perm:settings.view');
+
+            Route::put('/settings', [
+                SettingController::class,
+                'update'
+            ])->middleware('perm:settings.update');
 
 
             // Transaction History (processed requests audit)
