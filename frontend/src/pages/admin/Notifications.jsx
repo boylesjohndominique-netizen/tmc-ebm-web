@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BellRing, Send, Search, Check, CheckCheck, ClipboardList,
   CheckCircle2, Settings2, RotateCcw, Inbox, Lock, X,
-  ShieldCheck, UserPlus, Ban,
+  ShieldCheck, UserPlus, Ban, Archive, ArchiveRestore, Eye, EyeOff,
+  Trash2, Square, CheckSquare,
 } from 'lucide-react';
 import api from '../../services/api';
 import { useNotifications } from '../../context/NotificationContext';
@@ -44,9 +45,12 @@ export default function Notifications() {
   const [users, setUsers] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('inbox');   // inbox | archived | hidden
   const [tab, setTab] = useState('all');
   const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState([]); // notification ids
   const [form, setForm] = useState(emptyForm);
+  const [sendAll, setSendAll] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -92,22 +96,108 @@ export default function Notifications() {
     }
   };
 
+  /* ---- Views (inbox / archived / hidden) ---- */
+  const active = useMemo(() => items.filter(x => !x.archived_at && !x.hidden_at), [items]);
+  const archived = useMemo(() => items.filter(x => x.archived_at && !x.hidden_at), [items]);
+  const hidden = useMemo(() => items.filter(x => x.hidden_at), [items]);
+
+  const changeView = v => { setView(v); setTab('all'); setSelected([]); };
+
+  /* ---- Row & bulk mutations ---- */
+  const clearSelected = () => setSelected([]);
+
+  const runBulk = async (action, ids) => {
+    if (!ids.length) return;
+    setBusy(true); setError('');
+    try {
+      await api.post('/notifications/bulk', { action, ids });
+      clearSelected();
+      await load();
+      refresh();
+    } catch {
+      setError('Unable to update notifications. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const archiveRow = id => runBulk('archive', [id]);
+  const hideRow = id => runBulk('hide', [id]);
+  const restoreRow = id => runBulk(view === 'archived' ? 'unarchive' : 'unhide', [id]);
+
+  const deleteRow = async id => {
+    if (!await confirm({
+      title: 'Delete notification?',
+      message: 'This permanently removes the notification and cannot be undone.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })) return;
+    runBulk('delete', [id]);
+  };
+
+  const bulkDelete = async () => {
+    if (!await confirm({
+      title: `Delete ${selected.length} notification${selected.length === 1 ? '' : 's'}?`,
+      message: 'This permanently removes them and cannot be undone.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })) return;
+    runBulk('delete', selected);
+  };
+
+  const archiveAllRead = async () => {
+    if (!await confirm({
+      title: 'Archive all read?',
+      message: 'Move every read notification out of your inbox into the archive. You can restore them later.',
+      confirmLabel: 'Archive Read',
+    })) return;
+    setBusy(true); setError('');
+    try { await api.post('/notifications/archive-read'); await load(); refresh(); }
+    catch { setError('Unable to archive notifications.'); }
+    finally { setBusy(false); }
+  };
+
+  const clearArchived = async () => {
+    if (!await confirm({
+      title: 'Delete archived notifications?',
+      message: `Permanently delete all ${archived.length} archived notification${archived.length === 1 ? '' : 's'}. This cannot be undone.`,
+      confirmLabel: 'Delete All',
+      tone: 'danger',
+    })) return;
+    setBusy(true); setError('');
+    try { await api.delete('/notifications/archived'); await load(); refresh(); }
+    catch { setError('Unable to delete archived notifications.'); }
+    finally { setBusy(false); }
+  };
+
+  const toggleSelect = id => setSelected(s => s.includes(id) ? s.filter(i => i !== id) : [...s, id]);
+  const toggleSelectAll = () => (allSelected ? clearSelected() : setSelected(filtered.map(x => x.id)));
+
   const send = async e => {
     e.preventDefault();
+    if (!sendAll && !form.user_id) return;
     const recipient = users.find(x => String(x.id) === String(form.user_id));
+    const target = sendAll
+      ? `all ${users.length} user${users.length === 1 ? '' : 's'}`
+      : (recipient ? `${recipient.first_name} ${recipient.last_name}` : 'the selected user');
     if (!await confirm({
       title: 'Send notification?',
-      message: `Send "${form.title}" to ${recipient ? `${recipient.first_name} ${recipient.last_name}` : 'the selected user'}?`,
+      message: `Send "${form.title}" to ${target}?`,
       confirmLabel: 'Send',
     })) return;
     setBusy(true);
     setMsg('');
     setError('');
     try {
-      await api.post('/admin/notifications', form);
-      const u = users.find(x => String(x.id) === String(form.user_id));
-      setMsg(`Notification sent to ${u ? `${u.first_name} ${u.last_name}` : 'user'}.`);
+      const payload = sendAll
+        ? { title: form.title, message: form.message, type: form.type, all: true }
+        : form;
+      const { data } = await api.post('/admin/notifications', payload);
+      setMsg(sendAll
+        ? `Notification sent to ${data.count ?? users.length} user(s).`
+        : `Notification sent to ${recipient ? `${recipient.first_name} ${recipient.last_name}` : 'user'}.`);
       setForm({ ...emptyForm });
+      setSendAll(false);
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to send the notification.');
     } finally {
@@ -123,31 +213,39 @@ export default function Notifications() {
       tone: 'danger',
     })) return;
     setForm({ ...emptyForm });
+    setSendAll(false);
   };
 
-  /* Derived: counts for the stat cards + filtered list.
+  /* Derived: counts for the stat cards (inbox only) + filtered list.
      Unknown/legacy types are counted under System so totals always add up. */
   const counts = useMemo(() => {
     const byType = {};
-    for (const x of items) {
+    for (const x of active) {
       const t = TYPES[x.type] ? x.type : 'System';
       byType[t] = (byType[t] || 0) + 1;
     }
-    byType.total = items.length;
-    byType.unread = items.filter(x => !x.read_at).length;
+    byType.total = active.length;
+    byType.unread = active.filter(x => !x.read_at).length;
+    byType.archived = archived.length;
+    byType.hidden = hidden.length;
     return byType;
-  }, [items]);
+  }, [active, archived, hidden]);
 
-  const filtered = useMemo(() => items.filter(x => {
-    const type = TYPES[x.type] ? x.type : 'System';
-    if (tab === 'unread' && x.read_at) return false;
-    if (tab !== 'all' && tab !== 'unread' && type !== tab) return false;
-    if (query) {
-      const q = query.toLowerCase();
-      return (x.title || '').toLowerCase().includes(q) || (x.message || '').toLowerCase().includes(q);
-    }
-    return true;
-  }), [items, tab, query]);
+  const filtered = useMemo(() => {
+    const source = view === 'inbox' ? active : view === 'archived' ? archived : hidden;
+    return source.filter(x => {
+      const type = TYPES[x.type] ? x.type : 'System';
+      if (tab === 'unread' && x.read_at) return false;
+      if (tab !== 'all' && tab !== 'unread' && type !== tab) return false;
+      if (query) {
+        const q = query.toLowerCase();
+        return (x.title || '').toLowerCase().includes(q) || (x.message || '').toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [view, active, archived, hidden, tab, query]);
+
+  const allSelected = filtered.length > 0 && filtered.every(x => selected.includes(x.id));
 
   const hasFilters = tab !== 'all' || query.trim() !== '';
   const canSend = can('notifications', 'send');
@@ -198,34 +296,87 @@ export default function Notifications() {
               <h2>Notifications</h2>
               <p className="notif-subtitle">
                 {counts.unread > 0
-                  ? `${counts.unread} unread notification${counts.unread > 1 ? 's' : ''}.`
+                  ? `${counts.unread} unread notification${counts.unread > 1 ? 's' : ''} in your inbox.`
                   : 'You are all caught up.'}
               </p>
             </div>
-            <button
-              className="btn btn-secondary small"
-              onClick={markAllRead}
-              disabled={loading || counts.unread === 0}
-              title="Mark every notification as read"
-            >
-              <CheckCheck size={15} /> Mark All Read
-            </button>
+            <div className="notif-head-actions">
+              {view === 'inbox' && (
+                <button
+                  className="btn btn-secondary small"
+                  onClick={archiveAllRead}
+                  disabled={loading || busy || counts.total === 0}
+                  title="Move every read notification to the archive"
+                >
+                  <Archive size={15} /> Archive Read
+                </button>
+              )}
+              {view === 'archived' && archived.length > 0 && (
+                <button
+                  className="btn btn-danger small"
+                  onClick={clearArchived}
+                  disabled={loading || busy}
+                  title="Permanently delete all archived notifications"
+                >
+                  <Trash2 size={15} /> Delete Archived
+                </button>
+              )}
+              <button
+                className="btn btn-secondary small"
+                onClick={markAllRead}
+                disabled={loading || counts.unread === 0}
+                title="Mark every notification as read"
+              >
+                <CheckCheck size={15} /> Mark All Read
+              </button>
+            </div>
+          </div>
+
+          {/* View switcher: Inbox / Archived / Hidden */}
+          <div className="segmented-tabs notif-views" role="tablist" aria-label="Notification view">
+            {[
+              ['inbox', 'Inbox', active.length],
+              ['archived', 'Archived', archived.length],
+              ['hidden', 'Hidden', hidden.length],
+            ].map(([key, label, count]) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={view === key}
+                className={view === key ? 'active' : ''}
+                onClick={() => changeView(key)}
+              >
+                {label}
+                {count > 0 && <span className="tab-count">{count}</span>}
+              </button>
+            ))}
           </div>
 
           <div className="notif-toolbar">
-            <div className="segmented-tabs" role="tablist" aria-label="Filter notifications">
-              {FILTERS.map(f => (
-                <button
-                  key={f}
-                  role="tab"
-                  aria-selected={tab === f}
-                  className={tab === f ? 'active' : ''}
-                  onClick={() => setTab(f)}
-                >
-                  {filterLabel(f)}
-                  {f === 'unread' && counts.unread > 0 && <span className="tab-count">{counts.unread}</span>}
-                </button>
-              ))}
+            <div className="notif-tabs-wrap">
+              <button
+                className="row-icon-btn"
+                onClick={toggleSelectAll}
+                disabled={!filtered.length}
+                title={allSelected ? 'Clear selection' : 'Select all'}
+                aria-label={allSelected ? 'Clear selection' : 'Select all'}
+              >
+                {allSelected ? <CheckSquare size={15} /> : <Square size={15} />}
+              </button>
+              <div className="segmented-tabs" role="tablist" aria-label="Filter notifications">
+                {FILTERS.map(f => (
+                  <button
+                    key={f}
+                    role="tab"
+                    aria-selected={tab === f}
+                    className={tab === f ? 'active' : ''}
+                    onClick={() => setTab(f)}
+                  >
+                    {filterLabel(f)}
+                    {f === 'unread' && counts.unread > 0 && <span className="tab-count">{counts.unread}</span>}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="notif-search">
               <Search size={15} />
@@ -243,6 +394,39 @@ export default function Notifications() {
             </div>
           </div>
 
+          {/* Bulk action bar (appears when rows are selected) */}
+          {selected.length > 0 && (
+            <div className="notif-bulkbar">
+              <span>{selected.length} selected</span>
+              <div className="notif-bulkbar-actions">
+                <button className="btn btn-secondary small" onClick={() => runBulk('read', selected)}>
+                  <Check size={14} /> Mark read
+                </button>
+                {view !== 'archived' && (
+                  <button className="btn btn-secondary small" onClick={() => runBulk('archive', selected)}>
+                    <Archive size={14} /> Archive
+                  </button>
+                )}
+                {view === 'archived' && (
+                  <button className="btn btn-secondary small" onClick={() => runBulk('unarchive', selected)}>
+                    <ArchiveRestore size={14} /> Restore
+                  </button>
+                )}
+                {view === 'hidden' && (
+                  <button className="btn btn-secondary small" onClick={() => runBulk('unhide', selected)}>
+                    <Eye size={14} /> Restore
+                  </button>
+                )}
+                <button className="btn btn-danger small" onClick={bulkDelete}>
+                  <Trash2 size={14} /> Delete
+                </button>
+                <button className="btn btn-secondary small" onClick={clearSelected}>
+                  <X size={14} /> Clear
+                </button>
+              </div>
+            </div>
+          )}
+
           {loading && <Skeleton rows={5} />}
 
           {!loading && (filtered.length ? (
@@ -252,27 +436,37 @@ export default function Notifications() {
                   const meta = typeMeta(x.type);
                   const Icon = meta.icon;
                   const unreadRow = !x.read_at;
+                  const clickable = view === 'inbox' && unreadRow;
+                  const isSelected = selected.includes(x.id);
                   return (
                     <div
                       key={x.id}
-                      className={`notif-row ${unreadRow ? 'unread' : ''}`}
-                      onClick={() => unreadRow && markRead(x.id)}
-                      onKeyDown={e => { if (unreadRow && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); markRead(x.id); } }}
-                      role={unreadRow ? 'button' : undefined}
-                      tabIndex={unreadRow ? 0 : undefined}
-                      aria-label={unreadRow ? 'Mark as read' : undefined}
+                      className={`notif-row ${clickable ? 'unread' : ''} ${isSelected ? 'selected' : ''}`}
+                      onClick={() => clickable && markRead(x.id)}
+                      onKeyDown={e => { if (clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); markRead(x.id); } }}
+                      role={clickable ? 'button' : undefined}
+                      tabIndex={clickable ? 0 : undefined}
+                      aria-label={clickable ? 'Mark as read' : undefined}
                     >
+                      <input
+                        type="checkbox"
+                        className="notif-check"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(x.id)}
+                        onClick={e => e.stopPropagation()}
+                        aria-label="Select notification"
+                      />
                       <div className={`notif-icon ${meta.cls}`}><Icon size={18} /></div>
                       <div className="notif-body">
                         <div className="notif-title-row">
                           <h3 className={unreadRow ? 'unread-title' : ''}>{x.title}</h3>
-                          {unreadRow && <span className="new-chip">NEW</span>}
+                          {clickable && <span className="new-chip">NEW</span>}
                         </div>
                         <p className="notif-msg">{x.message}</p>
                         <small className="notif-time" title={fmtDateTime(x.created_at)}>{timeAgo(x.created_at)}</small>
                       </div>
                       <div className="notif-actions">
-                        {unreadRow
+                        {view === 'inbox' && (unreadRow
                           ? <button
                               className="row-icon-btn"
                               onClick={e => { e.stopPropagation(); markRead(x.id); }}
@@ -281,14 +475,62 @@ export default function Notifications() {
                             >
                               <Check size={15} />
                             </button>
-                          : <span className="row-icon-btn done" title="Read"><Check size={15} /></span>}
+                          : <span className="row-icon-btn done" title="Read"><Check size={15} /></span>)}
+                        {view === 'inbox' && (
+                          <>
+                            <button
+                              className="row-icon-btn"
+                              onClick={e => { e.stopPropagation(); archiveRow(x.id); }}
+                              title="Archive"
+                              aria-label="Archive"
+                            >
+                              <Archive size={15} />
+                            </button>
+                            <button
+                              className="row-icon-btn"
+                              onClick={e => { e.stopPropagation(); hideRow(x.id); }}
+                              title="Hide"
+                              aria-label="Hide"
+                            >
+                              <EyeOff size={15} />
+                            </button>
+                          </>
+                        )}
+                        {view === 'archived' && (
+                          <button
+                            className="row-icon-btn"
+                            onClick={e => { e.stopPropagation(); restoreRow(x.id); }}
+                            title="Restore from archive"
+                            aria-label="Restore"
+                          >
+                            <ArchiveRestore size={15} />
+                          </button>
+                        )}
+                        {view === 'hidden' && (
+                          <button
+                            className="row-icon-btn"
+                            onClick={e => { e.stopPropagation(); restoreRow(x.id); }}
+                            title="Unhide"
+                            aria-label="Unhide"
+                          >
+                            <Eye size={15} />
+                          </button>
+                        )}
+                        <button
+                          className="row-icon-btn danger"
+                          onClick={e => { e.stopPropagation(); deleteRow(x.id); }}
+                          title="Delete"
+                          aria-label="Delete"
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </div>
                   );
                 })}
               </div>
               <p className="notif-footer">
-                Showing {filtered.length} of {items.length} notification{items.length === 1 ? '' : 's'}
+                Showing {filtered.length} of {active.length + archived.length + hidden.length} notification{items.length === 1 ? '' : 's'}
               </p>
             </>
           ) : hasFilters ? (
@@ -301,8 +543,14 @@ export default function Notifications() {
           ) : (
             <EmptyState
               icon={BellRing}
-              title="No notifications"
-              message="System updates and messages will appear here."
+              title={view === 'inbox' ? 'Inbox is empty' : view === 'archived' ? 'Nothing archived' : 'Nothing hidden'}
+              message={
+                view === 'inbox'
+                  ? 'System updates and messages will appear here.'
+                  : view === 'archived'
+                    ? 'Notifications you archive to tidy your inbox will show up here.'
+                    : 'Notifications you hide will show up here.'
+              }
             />
           ))}
         </section>
@@ -315,7 +563,7 @@ export default function Notifications() {
                 <div className="compose-icon"><Send size={18} /></div>
                 <div>
                   <h2>Send Notification</h2>
-                  <p className="notif-subtitle">Message a staff member directly.</p>
+                  <p className="notif-subtitle">Message a user directly, or broadcast to everyone.</p>
                 </div>
               </div>
 
@@ -325,15 +573,25 @@ export default function Notifications() {
               <form onSubmit={send} className="compose-form">
                 <label>Recipient
                   <select
-                    value={form.user_id}
+                    value={sendAll ? '' : form.user_id}
                     onChange={e => setForm({ ...form, user_id: e.target.value })}
-                    required
+                    disabled={sendAll}
+                    required={!sendAll}
                   >
                     <option value="">Select user</option>
                     {users.map(u => (
                       <option key={u.id} value={u.id}>{u.first_name} {u.last_name} — {u.username}</option>
                     ))}
                   </select>
+                </label>
+
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={sendAll}
+                    onChange={e => setSendAll(e.target.checked)}
+                  />
+                  Send to all users ({users.length})
                 </label>
 
                 <label>Type
@@ -369,11 +627,11 @@ export default function Notifications() {
                 </label>
 
                 <div className="compose-actions">
-                  <button type="button" className="btn btn-danger" onClick={resetForm} disabled={busy || (!form.title && !form.message && !form.user_id)}>
+                  <button type="button" className="btn btn-danger" onClick={resetForm} disabled={busy || (!form.title && !form.message && !form.user_id && !sendAll)}>
                     <RotateCcw size={15} /> Reset
                   </button>
                   <button className="btn btn-primary" disabled={busy}>
-                    <Send size={15} /> {busy ? 'Sending…' : 'Send'}
+                    <Send size={15} /> {busy ? 'Sending…' : sendAll ? `Send to All (${users.length})` : 'Send'}
                   </button>
                 </div>
               </form>

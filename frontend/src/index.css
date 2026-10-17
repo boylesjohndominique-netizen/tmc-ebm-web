@@ -1632,6 +1632,82 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   text-align: right;
 }
 
+/* ── Notification views & bulk actions ── */
+
+.notif-views { margin-bottom: 14px; }
+
+.notif-tabs-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.notif-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.notif-check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin: 4px 0 0;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
+.notif-row.selected { background: var(--blue-ghost); }
+
+.notif-row.selected.unread {
+  background: linear-gradient(90deg, rgba(246, 200, 0, .1), var(--blue-ghost) 60%);
+}
+
+.notif-actions { display: flex; gap: 6px; }
+
+.row-icon-btn.danger:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.notif-bulkbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--blue-ghost);
+  border: 1px solid var(--border-soft);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.notif-bulkbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.checkbox-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.checkbox-row input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
 /* ── Compose panel ── */
 
 .compose-panel {
