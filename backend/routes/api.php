@@ -154,6 +154,21 @@ Route::middleware('auth:sanctum')->group(function () {
         'readAll'
     ]);
 
+    Route::post('/notifications/bulk', [
+        NotificationController::class,
+        'bulk'
+    ]);
+
+    Route::post('/notifications/archive-read', [
+        NotificationController::class,
+        'archiveRead'
+    ]);
+
+    Route::delete('/notifications/archived', [
+        NotificationController::class,
+        'clearArchived'
+    ]);
+
     Route::put('/notifications/{notification}/read', [
         NotificationController::class,
         'read'

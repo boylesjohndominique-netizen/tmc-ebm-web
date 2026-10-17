@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Notification extends Model
 {
-    protected $fillable = ['user_id','title','message','type','read_at'];
-    protected $casts = ['read_at' => 'datetime'];
+    protected $fillable = ['user_id','title','message','type','read_at','archived_at','hidden_at'];
+    protected $casts = ['read_at' => 'datetime', 'archived_at' => 'datetime', 'hidden_at' => 'datetime'];
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
 }
