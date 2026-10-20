@@ -8,14 +8,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Equipment extends Model
 {
     protected $fillable = [
-        'category_id','name','description','quantity',
-        'available_quantity','condition','status','image'
+        'category_id', 'name', 'description', 'quantity',
+        'available_quantity', 'condition', 'status', 'image', 'images',
     ];
 
     protected $casts = [
         'quantity' => 'integer',
-        'available_quantity' => 'integer'
+        'available_quantity' => 'integer',
+        'images' => 'array',
     ];
 
-    public function category(): BelongsTo { return $this->belongsTo(Category::class); }
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
 }

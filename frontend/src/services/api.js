@@ -20,9 +20,28 @@ const api = axios.create({
   }
 });
 
+export const equipmentImageUrl = (path) => {
+  if (!path || typeof path !== 'string') return null;
+  if (
+    path.startsWith('http://') ||
+    path.startsWith('https://') ||
+    path.startsWith('blob:') ||
+    path.startsWith('data:')
+  ) {
+    return path;
+  }
+  const filename = path.split('/').pop();
+  if (!filename) return null;
+  const base = (api.defaults.baseURL || '/api').replace(/\/$/, '');
+  return `${base}/equipment-media/${encodeURIComponent(filename)}`;
+};
+
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 
