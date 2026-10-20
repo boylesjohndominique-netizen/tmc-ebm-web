@@ -1876,6 +1876,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   padding: 20px 24px 16px;
   border-bottom: 1px solid var(--border-soft);
   background: linear-gradient(180deg, rgba(11, 78, 162, .04), transparent);
+  flex-shrink: 0;
 }
 
 .modal-header.danger {
@@ -1909,9 +1910,23 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   white-space: nowrap;
 }
 
+.modal > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .modal-body {
   padding: 18px 24px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+}
+
+.modal > form .modal-body > * + * {
+  margin-top: 14px;
 }
 
 .modal-body p { margin: 7px 0; font-size: 13.5px; }
@@ -1923,6 +1938,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   padding: 16px 24px;
   border-top: 1px solid var(--border-soft);
   background: rgba(11, 78, 162, .025);
+  flex-shrink: 0;
 }
 
 .close-btn {
