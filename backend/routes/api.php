@@ -1,25 +1,22 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\EquipmentController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\TransactionController;
-
-use App\Http\Controllers\Admin\UserManagementController;
-use App\Http\Controllers\Admin\EquipmentManagementController;
 use App\Http\Controllers\Admin\BorrowingManagementController;
-use App\Http\Controllers\Admin\ReturnManagementController;
+use App\Http\Controllers\Admin\EquipmentManagementController;
 use App\Http\Controllers\Admin\NotificationManagementController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\ReturnManagementController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\AppealController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\MobileController;
-
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TransactionController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,15 +27,14 @@ use App\Http\Controllers\MobileController;
 // Login
 Route::post('/login', [
     AuthController::class,
-    'login'
+    'login',
 ]);
 
 // Public student self-registration (mobile app) — creates a Pending account
 Route::post('/register', [
     AuthController::class,
-    'register'
+    'register',
 ]);
-
 
 // =====================================================
 // EMAIL VERIFICATION ROUTES (PUBLIC)
@@ -46,14 +42,13 @@ Route::post('/register', [
 
 Route::post('/verify-email', [
     AuthController::class,
-    'verifyEmail'
+    'verifyEmail',
 ]);
 
 Route::post('/resend-verification', [
     AuthController::class,
-    'resendVerification'
+    'resendVerification',
 ]);
-
 
 // =====================================================
 // MOBILE APP LOGIN
@@ -61,9 +56,8 @@ Route::post('/resend-verification', [
 
 Route::post('/mobile/login', [
     AuthController::class,
-    'mobileLogin'
+    'mobileLogin',
 ]);
-
 
 // =====================================================
 // BAN APPEAL (PUBLIC — banned users have no valid token)
@@ -71,9 +65,8 @@ Route::post('/mobile/login', [
 
 Route::post('/appeals', [
     AppealController::class,
-    'store'
+    'store',
 ])->middleware('throttle:5,1');
-
 
 // =====================================================
 // FORGOT PASSWORD ROUTES (CODE-BASED FOR MOBILE)
@@ -82,15 +75,25 @@ Route::post('/appeals', [
 // Request password reset code
 Route::post('/forgot-password', [
     AuthController::class,
-    'forgotPassword'
+    'forgotPassword',
 ]);
+
+// Public equipment image streaming (works across localhost, LAN, and ngrok)
+Route::get('/equipment-media/{filename}', [
+    EquipmentController::class,
+    'media',
+])->where('filename', '[A-Za-z0-9._-]+');
+
+Route::get('/user-avatar/{filename}', [
+    MobileController::class,
+    'userAvatar',
+])->where('filename', '[A-Za-z0-9._-]+');
 
 // Reset password using code
 Route::post('/reset-password', [
     AuthController::class,
-    'resetPassword'
+    'resetPassword',
 ]);
-
 
 // =====================================================
 // PROTECTED ROUTES
@@ -101,14 +104,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Authentication
     Route::post('/logout', [
         AuthController::class,
-        'logout'
+        'logout',
     ]);
 
     Route::get('/me', [
         AuthController::class,
-        'me'
+        'me',
     ]);
-
 
     // =================================================
     // DASHBOARD (ADMIN OVERVIEW)
@@ -116,14 +118,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/dashboard', [
         DashboardController::class,
-        'index'
+        'index',
     ])->middleware('perm:dashboard.view');
 
     Route::get('/admin/analytics', [
         DashboardController::class,
-        'analytics'
+        'analytics',
     ])->middleware('perm:dashboard.view');
-
 
     // =================================================
     // EQUIPMENT (READ — USED BY ADMIN PAGES)
@@ -131,9 +132,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/equipment', [
         EquipmentController::class,
-        'index'
+        'index',
     ])->middleware('perm:equipment.view');
-
 
     // =================================================
     // NOTIFICATIONS (own notifications — all staff users)
@@ -141,39 +141,38 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/notifications', [
         NotificationController::class,
-        'index'
+        'index',
     ]);
 
     Route::get('/notifications/unread-count', [
         NotificationController::class,
-        'unreadCount'
+        'unreadCount',
     ]);
 
     Route::put('/notifications/read-all', [
         NotificationController::class,
-        'readAll'
+        'readAll',
     ]);
 
     Route::post('/notifications/bulk', [
         NotificationController::class,
-        'bulk'
+        'bulk',
     ]);
 
     Route::post('/notifications/archive-read', [
         NotificationController::class,
-        'archiveRead'
+        'archiveRead',
     ]);
 
     Route::delete('/notifications/archived', [
         NotificationController::class,
-        'clearArchived'
+        'clearArchived',
     ]);
 
     Route::put('/notifications/{notification}/read', [
         NotificationController::class,
-        'read'
+        'read',
     ]);
-
 
     // =================================================
     // PROFILE
@@ -181,19 +180,18 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/profile', [
         ProfileController::class,
-        'show'
+        'show',
     ]);
 
     Route::put('/profile', [
         ProfileController::class,
-        'update'
+        'update',
     ]);
 
     Route::put('/profile/password', [
         ProfileController::class,
-        'password'
+        'password',
     ]);
-
 
     // =================================================
     // ADMIN ROUTES
@@ -206,147 +204,144 @@ Route::middleware('auth:sanctum')->group(function () {
             // Users
             Route::get('/users', [
                 UserManagementController::class,
-                'index'
+                'index',
             ])->middleware('perm:users.view');
 
             Route::post('/users', [
                 UserManagementController::class,
-                'store'
+                'store',
             ])->middleware('perm:users.create');
 
             Route::get('/users/{user}', [
                 UserManagementController::class,
-                'show'
+                'show',
             ])->middleware('perm:users.view');
 
             Route::put('/users/{user}', [
                 UserManagementController::class,
-                'update'
+                'update',
             ])->middleware('perm:users.edit');
 
             Route::delete('/users/{user}', [
                 UserManagementController::class,
-                'destroy'
+                'destroy',
             ])->middleware('perm:users.delete');
 
             // Account verification (student self-registrations)
             Route::put('/users/{user}/verify', [
                 UserManagementController::class,
-                'verify'
+                'verify',
             ])->middleware('perm:users.verify');
 
             // Ban / unban any non-admin account
             Route::put('/users/{user}/ban', [
                 UserManagementController::class,
-                'ban'
+                'ban',
             ])->middleware('perm:users.ban');
 
             Route::put('/users/{user}/unban', [
                 UserManagementController::class,
-                'unban'
+                'unban',
             ])->middleware('perm:users.ban');
 
             // View a student's submitted ID photos (private disk, streamed to
             // authorized staff only — images are never publicly reachable).
             Route::get('/users/{user}/id-photo/{side}', [
                 UserManagementController::class,
-                'idPhoto'
+                'idPhoto',
             ])->middleware('perm:users.view');
-
 
             // Equipment
             Route::get('/equipment/{equipment}', [
                 EquipmentManagementController::class,
-                'show'
+                'show',
             ])->middleware('perm:equipment.view');
 
             Route::post('/equipment', [
                 EquipmentManagementController::class,
-                'store'
+                'store',
             ])->middleware('perm:equipment.create');
 
             Route::put('/equipment/{equipment}', [
                 EquipmentManagementController::class,
-                'update'
+                'update',
+            ])->middleware('perm:equipment.edit');
+
+            Route::post('/equipment/{equipment}', [
+                EquipmentManagementController::class,
+                'update',
             ])->middleware('perm:equipment.edit');
 
             Route::delete('/equipment/{equipment}', [
                 EquipmentManagementController::class,
-                'destroy'
+                'destroy',
             ])->middleware('perm:equipment.delete');
-
 
             // Borrowing Requests
             Route::get('/borrowings', [
                 BorrowingManagementController::class,
-                'index'
+                'index',
             ])->middleware('perm:borrowings.view');
 
             Route::put('/borrowings/{borrowing}/process', [
                 BorrowingManagementController::class,
-                'process'
+                'process',
             ])->middleware('perm:borrowings.process');
-
 
             // Return Requests
             Route::get('/returns', [
                 ReturnManagementController::class,
-                'index'
+                'index',
             ])->middleware('perm:returns.view');
 
             Route::put('/returns/{returnRequest}/process', [
                 ReturnManagementController::class,
-                'process'
+                'process',
             ])->middleware('perm:returns.process');
-
 
             // Admin Notifications (broadcast tool)
             Route::post('/notifications', [
                 NotificationManagementController::class,
-                'store'
+                'store',
             ])->middleware('perm:notifications.send');
 
             Route::get('/notification-users', [
                 NotificationManagementController::class,
-                'users'
+                'users',
             ])->middleware('perm:notifications.send');
-
 
             // Reports
             Route::get('/reports', [
                 ReportController::class,
-                'index'
+                'index',
             ])->middleware('perm:reports.view');
 
             Route::get('/reports/export', [
                 ReportController::class,
-                'export'
+                'export',
             ])->middleware('perm:reports.view');
-
 
             // System Settings (overdue fee, etc.)
             Route::get('/settings', [
                 SettingController::class,
-                'index'
+                'index',
             ])->middleware('perm:settings.view');
 
             Route::put('/settings', [
                 SettingController::class,
-                'update'
+                'update',
             ])->middleware('perm:settings.update');
 
             Route::put('/settings/policies', [
                 SettingController::class,
-                'updatePolicies'
+                'updatePolicies',
             ])->middleware('perm:settings.update');
-
 
             // Transaction History (processed requests audit)
             Route::get('/transactions', [
                 TransactionController::class,
-                'index'
+                'index',
             ])->middleware('perm:transactions.view');
-
 
             // =============================================
             // PERMISSION MANAGEMENT (SUPER ADMIN ONLY)
@@ -357,22 +352,22 @@ Route::middleware('auth:sanctum')->group(function () {
                 // Catalog + editable users
                 Route::get('/permissions', [
                     PermissionController::class,
-                    'index'
+                    'index',
                 ]);
 
                 Route::get('/permissions/{user}', [
                     PermissionController::class,
-                    'show'
+                    'show',
                 ]);
 
                 Route::put('/permissions/{user}', [
                     PermissionController::class,
-                    'update'
+                    'update',
                 ]);
 
                 Route::put('/permissions/{user}/reset', [
                     PermissionController::class,
-                    'reset'
+                    'reset',
                 ]);
 
             });
@@ -380,7 +375,6 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
 });
-
 
 // =====================================================
 // MOBILE APP ROUTES (authenticated)
@@ -411,11 +405,16 @@ Route::middleware('auth:sanctum')
         // Profile
         Route::get('/profile', [MobileController::class, 'profile']);
         Route::put('/profile', [MobileController::class, 'updateProfile']);
+        Route::post('/profile', [MobileController::class, 'updateProfile']);
+        Route::post('/profile/avatar', [MobileController::class, 'updateAvatar']);
         Route::put('/profile/password', [MobileController::class, 'changePassword']);
 
         // ID verification (private storage; admin review via the Users page)
         Route::post('/id-verification', [MobileController::class, 'submitIdVerification']);
         Route::get('/id-photo/{side}', [MobileController::class, 'myIdPhoto'])->where('side', 'front|back');
+
+        // System settings & platform policies (read-only for mobile users)
+        Route::get('/settings', [MobileController::class, 'settings']);
 
         // Logout
         Route::post('/logout', [AuthController::class, 'logout']);
