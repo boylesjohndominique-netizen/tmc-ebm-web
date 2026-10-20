@@ -270,6 +270,7 @@ select:focus-visible {
 
 /* Icons-only circular nav buttons */
 .sidebar nav a,
+.sidebar nav .nav-group,
 .profile-link,
 .logout-link {
   display: flex;
@@ -301,6 +302,7 @@ select:focus-visible {
 
 /* Hover: lift + glow + scale (desktop mouse) */
 .sidebar nav a:hover,
+.sidebar nav .nav-group:hover,
 .sidebar .profile-link:hover,
 .sidebar .logout-link:hover {
   background: rgba(255, 255, 255, .1);
@@ -340,6 +342,67 @@ select:focus-visible {
 .logout-link { margin-bottom: 2px; }
 .logout-link:hover { color: #ffb4a8; }
 
+/* Collapsible nav group — parent button with a dropping child list */
+.nav-group-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Parent wears a soft ring (not the full yellow fill) while a child is active */
+.sidebar nav .nav-group.active {
+  background: rgba(246, 200, 0, .16);
+  color: var(--white);
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--yellow);
+}
+
+/* Dropdown arrow on the corner of the button (flips up when open) */
+.sidebar nav .nav-group .nav-caret {
+  position: absolute;
+  right: -2px;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  color: var(--yellow);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55));
+  transition: transform var(--t-fast) var(--ease);
+}
+.sidebar nav .nav-group.open .nav-caret { transform: rotate(180deg); }
+
+/* Child list — nodes threaded to each other and up to the parent button */
+.nav-sub {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.sidebar nav .nav-sub a {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+}
+/* connector segment filling the gap above each child (links to node above) */
+.sidebar nav .nav-sub a::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .24);
+}
+
 .sidebar-empty {
   color: #7fa3cf;
   font-size: 10.5px;
@@ -347,35 +410,29 @@ select:focus-visible {
   text-align: center;
 }
 
-/* Hover tooltips — page names on mouse-capable devices only */
-@media (hover: hover) and (pointer: fine) {
-  .nav-tip::after {
-    content: attr(data-label);
-    position: absolute;
-    left: calc(100% + 12px);
-    top: 50%;
-    transform: translateY(-50%) translateX(-4px);
-    background: #0a1d38;
-    color: #eaf2fc;
-    border: 1px solid rgba(255, 255, 255, .12);
-    font-size: 12px;
-    font-weight: 600;
-    font-family: var(--font-display);
-    line-height: 1;
-    padding: 8px 11px;
-    border-radius: 9px;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    box-shadow: var(--shadow-md);
-    transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
-    z-index: 60;
-  }
-  .nav-tip:hover::after,
-  .nav-tip:focus-visible::after {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0);
-  }
+/* Hover tooltips — JS-positioned (fixed) so they escape the rail's
+   scroll clip; only shown on mouse-capable devices */
+.nav-tooltip {
+  position: fixed;
+  left: calc(var(--nav-rail-left) + var(--nav-rail-w) + 12px);
+  transform: translateY(-50%);
+  background: #0a1d38;
+  color: #eaf2fc;
+  border: 1px solid rgba(255, 255, 255, .12);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  line-height: 1;
+  padding: 8px 11px;
+  border-radius: 9px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+  z-index: 90;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .nav-tooltip { display: none; }
 }
 
 .main-area {
@@ -584,6 +641,13 @@ select:focus-visible {
   margin: 0;
   color: var(--muted);
   font-size: 13.5px;
+}
+
+.page-heading-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 /* =========================================================
@@ -1692,22 +1756,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 .notif-bulkbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.checkbox-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--text-soft);
-}
-
-.checkbox-row input {
-  width: auto;
-  margin: 0;
-  accent-color: var(--blue);
-}
-
 /* ── Compose panel ── */
 
 .compose-panel {
@@ -2087,6 +2135,40 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .action-cell { white-space: nowrap; }
 .action-cell .btn + .btn { margin-left: 6px; }
 .small-note { font-size: 12px; margin: 4px 0 12px; color: var(--faint); }
+
+/* ---- System settings: platform policies ---- */
+.settings-section {
+  margin-top: 30px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-soft);
+}
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.policy-card {
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+  background: var(--blue-ghost);
+}
+.policy-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.policy-index {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 
 /* ---- Borrowing form ---- */
 .borrower-info { margin-bottom: 18px; }
@@ -2873,7 +2955,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 
 /* Dark tooltip surface */
-[data-theme="dark"] .nav-tip::after {
+[data-theme="dark"] .nav-tooltip {
   background: var(--raised);
   color: var(--text);
   border-color: var(--border);
@@ -3168,6 +3250,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .sidebar-label { display: block; padding: 8px 10px; }
   .sidebar nav { gap: 2px; padding: 8px 0 4px; }
   .sidebar nav a,
+  .sidebar nav .nav-group,
   .profile-link,
   .logout-link {
     width: 100%;
@@ -3201,6 +3284,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
     color: rgba(255, 255, 255, .85);
   }
   .sidebar nav a:active,
+  .sidebar nav .nav-group:active,
   .sidebar .profile-link:active,
   .sidebar .logout-link:active,
   .close-sidebar:active {
@@ -3208,6 +3292,39 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
     background: rgba(255, 255, 255, .14);
   }
   .sidebar .profile-link.active { background: rgba(246, 200, 0, .16); }
+
+  /* Group grows into an indented, threaded list on the mobile panel */
+  .nav-group-wrap { align-items: stretch; gap: 2px; }
+  .sidebar nav .nav-group .nav-caret {
+    position: static;
+    right: auto;
+    bottom: auto;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    margin-left: auto;
+    filter: none;
+    color: inherit;
+  }
+  .nav-sub {
+    align-self: stretch;
+    align-items: stretch;
+    gap: 2px;
+    padding-left: 14px;
+    margin-left: 22px;
+    border-left: 2px solid rgba(255, 255, 255, .16);
+  }
+  .sidebar nav .nav-sub a::before { display: none; }
+  .sidebar nav .nav-sub a {
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    justify-content: flex-start;
+    padding: 11px 14px;
+    border-radius: 12px;
+    gap: 12px;
+    font-size: 13px;
+  }
   .dashboard-grid, .equipment-grid, .form-grid { grid-template-columns: 1fr; }
   .page-heading { align-items: flex-start; flex-direction: column; }
   .toolbar { flex-direction: column; }

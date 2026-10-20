@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  BarChart3, ClipboardList, FileText, History, Printer, RotateCcw, Users as UsersIcon,
+  BarChart3, ClipboardList, FileSpreadsheet, FileText, History, Printer, RotateCcw, Users as UsersIcon,
 } from 'lucide-react';
 import api from '../../services/api';
 import StatusBadge from '../../components/StatusBadge';
@@ -27,6 +27,7 @@ export default function Reports() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(() => {
     const request = report === 'audit'
@@ -59,16 +60,43 @@ export default function Reports() {
 
   const clearFilters = () => { setFrom(''); setTo(''); };
 
+  const exportExcel = async () => {
+    setExporting(true); setError('');
+    try {
+      const res = await api.get('/admin/reports/export', {
+        params: { from, to },
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `TMC-General-Report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Unable to export the report. Please try again.');
+    } finally { setExporting(false); }
+  };
+
   return (
     <>
       <div className="page-heading">
         <div>
           <h1>Reports</h1>
-          <p>Generate and print system reports — choose a report below.</p>
+          <p>Generate, export or print system reports — choose a report below.</p>
         </div>
-        <button className="btn btn-secondary print-hide" onClick={() => window.print()} disabled={loading}>
-          <Printer size={16} /> Print / Save PDF
-        </button>
+        <div className="page-heading-actions">
+          <button className="btn btn-primary print-hide" onClick={exportExcel} disabled={exporting || loading}>
+            <FileSpreadsheet size={16} /> {exporting ? 'Exporting…' : 'Export to Excel'}
+          </button>
+          <button className="btn btn-secondary print-hide" onClick={() => window.print()} disabled={loading}>
+            <Printer size={16} /> Print / Save PDF
+          </button>
+        </div>
       </div>
 
       {/* Only visible on the printed report */}

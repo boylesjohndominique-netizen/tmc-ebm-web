@@ -1,11 +1,13 @@
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, ClipboardList, RotateCcw, Bell, Users, BarChart3, ShieldCheck, Settings, LogOut, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Boxes, Package, ClipboardList, RotateCcw, Bell, Users, BarChart3, ShieldCheck, Settings, LogOut, X, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useConfirm } from '../context/ConfirmContext';
 
 /**
- * Sidebar directory: [route, label, icon, module].
+ * Sidebar directory. Each entry is either a plain link or a collapsible
+ * group (type: 'group') whose children drop down on click.
  * The module key is checked against the signed-in user's permissions;
  * links to modules they cannot view are hidden entirely.
  *
@@ -13,15 +15,23 @@ import { useConfirm } from '../context/ConfirmContext';
  * the Reports page ("Transaction Audit" report) and a standalone page
  * would duplicate it.
  */
-const adminLinks = [
-  ['/admin', 'Dashboard', LayoutDashboard, 'dashboard'],
-  ['/admin/users', 'Users', Users, 'users'],
-  ['/admin/equipment', 'Equipment', Package, 'equipment'],
-  ['/admin/borrowing-requests', 'Borrowing Requests', ClipboardList, 'borrowings'],
-  ['/admin/return-requests', 'Return Requests', RotateCcw, 'returns'],
-  ['/admin/notifications', 'Notifications', Bell, 'notifications'],
-  ['/admin/reports', 'Reports', BarChart3, 'reports'],
-  ['/admin/settings', 'Settings', Settings, 'settings'],
+const adminNav = [
+  { type: 'link', to: '/admin', label: 'Dashboard', icon: LayoutDashboard, module: 'dashboard' },
+  { type: 'link', to: '/admin/users', label: 'Users', icon: Users, module: 'users' },
+  {
+    type: 'group',
+    id: 'equipment',
+    label: 'Equipment Management',
+    icon: Boxes,
+    children: [
+      { to: '/admin/equipment', label: 'Equipment', icon: Package, module: 'equipment' },
+      { to: '/admin/borrowing-requests', label: 'Borrowing Requests', icon: ClipboardList, module: 'borrowings' },
+      { to: '/admin/return-requests', label: 'Return Requests', icon: RotateCcw, module: 'returns' },
+    ],
+  },
+  { type: 'link', to: '/admin/notifications', label: 'Notifications', icon: Bell, module: 'notifications' },
+  { type: 'link', to: '/admin/reports', label: 'Reports', icon: BarChart3, module: 'reports' },
+  { type: 'link', to: '/admin/settings', label: 'Settings', icon: Settings, module: 'settings' },
 ];
 
 function initials(name = '') {
@@ -32,17 +42,39 @@ function initials(name = '') {
 
 /**
  * Floating navigation — a slim rail of circular icon buttons on desktop
- * (page names appear as hover tooltips via data-label) and, on mobile,
- * the same markup becomes the floating panel with names shown next to
- * the icons (CSS decides; this component only carries both variants).
+ * and, on mobile, the same markup becomes the floating panel with names
+ * shown next to the icons (CSS decides; this component only carries both
+ * variants). On pointer devices every button reveals its name in a
+ * tooltip on hover/focus, positioned in JS so it is not clipped by the
+ * rail's scroll container.
  */
 export default function Sidebar({ open, onClose }) {
   const { logout, can, isSuperAdmin, user } = useAuth();
   const { unread } = useNotifications();
   const confirm = useConfirm();
+  const location = useLocation();
+  const [openGroup, setOpenGroup] = useState(null);
+  const [tip, setTip] = useState(null);
 
-  const visible = adminLinks.filter(([, , , module]) => can(module, 'view'));
+  const nav = adminNav
+    .map(item => item.type === 'group'
+      ? { ...item, children: item.children.filter(c => can(c.module, 'view')) }
+      : item)
+    .filter(item => item.type === 'group' ? item.children.length > 0 : can(item.module, 'view'));
+
+  // Keep the group expanded while the admin is inside one of its pages.
+  useEffect(() => {
+    const group = nav.find(item => item.type === 'group' && item.children.some(c => c.to === location.pathname));
+    if (group) setOpenGroup(group.id);
+  }, [location.pathname]);
+
   const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '?';
+
+  const showTip = label => e => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ label, top: r.top + r.height / 2 });
+  };
+  const hideTip = () => setTip(null);
 
   const handleLogout = async () => {
     if (await confirm({
@@ -65,38 +97,119 @@ export default function Sidebar({ open, onClose }) {
       <div className="sidebar-label">ADMINISTRATION</div>
 
       <nav>
-        {visible.map(([to, label, Icon]) => (
-          <NavLink key={to} to={to} end={to === '/admin'} className="nav-tip" data-label={label} onClick={onClose}>
-            <span className="nav-icon">
-              <Icon size={19} />
-              {to === '/admin/notifications' && unread > 0 && <span className="notification-count">{unread}</span>}
-            </span>
-            <span className="nav-name">{label}</span>
-          </NavLink>
-        ))}
+        {nav.map(item => {
+          if (item.type === 'link') {
+            const { to, label, icon: Icon } = item;
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/admin'}
+                onClick={onClose}
+                onMouseEnter={showTip(label)}
+                onMouseLeave={hideTip}
+                onFocus={showTip(label)}
+                onBlur={hideTip}
+              >
+                <span className="nav-icon">
+                  <Icon size={19} />
+                  {to === '/admin/notifications' && unread > 0 && <span className="notification-count">{unread}</span>}
+                </span>
+                <span className="nav-name">{label}</span>
+              </NavLink>
+            );
+          }
+
+          const { id, label, icon: Icon, children } = item;
+          const isOpen = openGroup === id;
+          const sectionActive = children.some(c => c.to === location.pathname);
+          return (
+            <div className="nav-group-wrap" key={id}>
+              <button
+                type="button"
+                className={`nav-group ${isOpen ? 'open' : ''} ${sectionActive ? 'active' : ''}`}
+                aria-expanded={isOpen}
+                aria-label={label}
+                onClick={() => setOpenGroup(isOpen ? null : id)}
+                onMouseEnter={showTip(label)}
+                onMouseLeave={hideTip}
+                onFocus={showTip(label)}
+                onBlur={hideTip}
+              >
+                <span className="nav-icon"><Icon size={19} /></span>
+                <span className="nav-name">{label}</span>
+                <ChevronDown size={16} className="nav-caret" />
+              </button>
+              {isOpen && (
+                <div className="nav-sub">
+                  {children.map(({ to, label: childLabel, icon: ChildIcon }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={onClose}
+                      onMouseEnter={showTip(childLabel)}
+                      onMouseLeave={hideTip}
+                      onFocus={showTip(childLabel)}
+                      onBlur={hideTip}
+                    >
+                      <span className="nav-icon"><ChildIcon size={18} /></span>
+                      <span className="nav-name">{childLabel}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {isSuperAdmin && (
-          <NavLink to="/admin/permissions" className="nav-tip" data-label="Permissions" onClick={onClose}>
+          <NavLink
+            to="/admin/permissions"
+            onClick={onClose}
+            onMouseEnter={showTip('Permissions')}
+            onMouseLeave={hideTip}
+            onFocus={showTip('Permissions')}
+            onBlur={hideTip}
+          >
             <span className="nav-icon"><ShieldCheck size={19} /></span>
             <span className="nav-name">Permissions</span>
           </NavLink>
         )}
 
-        {!visible.length && !isSuperAdmin && (
+        {!nav.length && !isSuperAdmin && (
           <span className="sidebar-empty">No modules available</span>
         )}
       </nav>
 
       {/* Profile — circular avatar button, navigates to the Profile page */}
-      <NavLink to="/admin/profile" className="profile-link nav-tip" data-label="Profile" onClick={onClose}>
+      <NavLink
+        to="/admin/profile"
+        className="profile-link"
+        onClick={onClose}
+        onMouseEnter={showTip('Profile')}
+        onMouseLeave={hideTip}
+        onFocus={showTip('Profile')}
+        onBlur={hideTip}
+      >
         <span className="avatar-initials">{initials(fullName)}</span>
         <span className="nav-name">Profile</span>
       </NavLink>
 
-      <button className="logout-link nav-tip" data-label="Logout" onClick={handleLogout}>
+      <button
+        className="logout-link"
+        onClick={handleLogout}
+        onMouseEnter={showTip('Logout')}
+        onMouseLeave={hideTip}
+        onFocus={showTip('Logout')}
+        onBlur={hideTip}
+      >
         <LogOut size={19} />
         <span className="nav-name">Logout</span>
       </button>
+
+      {tip && (
+        <span className="nav-tooltip" style={{ top: tip.top }} role="tooltip">{tip.label}</span>
+      )}
     </aside>
   );
 }

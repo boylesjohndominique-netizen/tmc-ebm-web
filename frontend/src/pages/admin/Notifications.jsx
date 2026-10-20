@@ -38,6 +38,8 @@ const FILTERS = ['all', 'unread', 'Borrow', 'Return', 'Verification', 'Registrat
 const filterLabel = f =>
   f === 'all' ? 'All' : f === 'unread' ? 'Unread' : f;
 
+const SEND_ALL = '__all__';
+
 export default function Notifications() {
   const { can } = useAuth();
   const confirm = useConfirm();
@@ -573,25 +575,20 @@ export default function Notifications() {
               <form onSubmit={send} className="compose-form">
                 <label>Recipient
                   <select
-                    value={sendAll ? '' : form.user_id}
-                    onChange={e => setForm({ ...form, user_id: e.target.value })}
-                    disabled={sendAll}
-                    required={!sendAll}
+                    value={sendAll ? SEND_ALL : form.user_id}
+                    onChange={e => {
+                      const v = e.target.value;
+                      setSendAll(v === SEND_ALL);
+                      setForm({ ...form, user_id: v === SEND_ALL ? '' : v });
+                    }}
+                    required
                   >
                     <option value="">Select user</option>
+                    <option value={SEND_ALL}>All users ({users.length})</option>
                     {users.map(u => (
                       <option key={u.id} value={u.id}>{u.first_name} {u.last_name} — {u.username}</option>
                     ))}
                   </select>
-                </label>
-
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={sendAll}
-                    onChange={e => setSendAll(e.target.checked)}
-                  />
-                  Send to all users ({users.length})
                 </label>
 
                 <label>Type
