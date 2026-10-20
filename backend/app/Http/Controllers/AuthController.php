@@ -10,7 +10,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 /**
  * Authentication for the admin web system plus public student
@@ -48,7 +47,7 @@ class AuthController extends Controller
             ->with('role')
             ->first();
 
-        if (!$user || !Hash::check($data['password'], $user->password)) {
+        if (! $user || ! Hash::check($data['password'], $user->password)) {
             return response()->json([
                 'message' => 'Invalid username/email or password.',
             ], 422);
@@ -79,7 +78,7 @@ class AuthController extends Controller
         }
 
         // Staff/Faculty without even dashboard access are blocked at login.
-        if (!$user->isSuperAdmin() && $user->role?->name !== 'Administrator' && !$user->canAccess('dashboard', 'view')) {
+        if (! $user->isSuperAdmin() && $user->role?->name !== 'Administrator' && ! $user->canAccess('dashboard', 'view')) {
             return response()->json([
                 'message' => 'Your account does not have access to the web system. '
                     .'Please contact the Super Admin.',
@@ -126,14 +125,14 @@ class AuthController extends Controller
         // registration reveals which emails/usernames are taken, so this
         // does not introduce a new class of user enumeration. The web admin
         // login (/login) intentionally keeps its generic message.
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'message' => 'Username/email not found. Please check your username or email.',
                 'error' => 'account_not_found',
             ], 422);
         }
 
-        if (!Hash::check($data['password'], $user->password)) {
+        if (! Hash::check($data['password'], $user->password)) {
             return response()->json([
                 'message' => 'Incorrect password. Please try again.',
                 'error' => 'incorrect_password',
@@ -154,7 +153,7 @@ class AuthController extends Controller
         // until an administrator verifies their uploaded ID photos.
 
         // Check if email is verified
-        if (!$user->email_verified_at) {
+        if (! $user->email_verified_at) {
             // Resend code if expired
             $this->generateAndSendVerificationCode($user);
 
@@ -193,7 +192,8 @@ class AuthController extends Controller
             'first_name' => ['required', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
-            'username' => ['required', 'string', 'max:100', 'alpha_dash', 'unique:users,username'],
+            'id_number' => ['nullable', 'string', 'max:20', 'regex:/^\d{2}-\d{6}$/'],
+            'username' => ['nullable', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
@@ -203,12 +203,23 @@ class AuthController extends Controller
 
         $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
+        $baseUsername = trim($data['username'] ?? '') !== ''
+            ? trim($data['username'])
+            : trim($data['first_name']);
+        $username = $baseUsername;
+        $suffix = 1;
+        while (User::where('username', $username)->exists()) {
+            $username = "{$baseUsername}{$suffix}";
+            $suffix++;
+        }
+
         $user = User::create([
             'role_id' => $studentRole->id,
             'first_name' => $data['first_name'],
             'middle_name' => $data['middle_name'] ?? null,
             'last_name' => $data['last_name'],
-            'username' => $data['username'],
+            'id_number' => $data['id_number'] ?? null,
+            'username' => $username,
             'email' => $data['email'],
             'contact_number' => $data['contact_number'] ?? null,
             'password' => $data['password'],
@@ -219,7 +230,7 @@ class AuthController extends Controller
 
         // Send verification email with code and one-click verification link
         try {
-            $verificationUrl = url('/verify-email-link?email=' . urlencode($user->email) . '&code=' . $code);
+            $verificationUrl = url('/verify-email-link?email='.urlencode($user->email).'&code='.$code);
             Mail::to($user->email)->send(new VerificationCodeMail(
                 code: $code,
                 userName: $user->first_name,
@@ -261,7 +272,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'No account found with this email.'], 404);
         }
 
@@ -311,7 +322,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'No account found with this email.'], 404);
         }
 
@@ -337,7 +348,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
-        if (!$user) {
+        if (! $user) {
             // Don't reveal whether the email exists
             return response()->json([
                 'message' => 'If an account exists with this email, a reset code has been sent.',
@@ -378,7 +389,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'Invalid email or code.'], 422);
         }
 
@@ -437,7 +448,7 @@ class AuthController extends Controller
         ]);
 
         try {
-            $verificationUrl = url('/verify-email-link?email=' . urlencode($user->email) . '&code=' . $code);
+            $verificationUrl = url('/verify-email-link?email='.urlencode($user->email).'&code='.$code);
             Mail::to($user->email)->send(new VerificationCodeMail(
                 code: $code,
                 userName: $user->first_name,

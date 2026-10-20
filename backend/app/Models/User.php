@@ -2,27 +2,27 @@
 
 namespace App\Models;
 
+use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
+use Illuminate\Contracts\Auth\CanResetPassword;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-use Illuminate\Contracts\Auth\CanResetPassword;
-use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
-
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
 class User extends Authenticatable implements CanResetPassword
 {
+    use CanResetPasswordTrait;
     use HasApiTokens;
     use Notifiable;
-    use CanResetPasswordTrait;
 
     protected $fillable = [
         'role_id',
         'first_name',
         'middle_name',
         'last_name',
+        'id_number',
+        'profile_photo_path',
         'username',
         'email',
         'contact_number',
@@ -84,7 +84,7 @@ class User extends Authenticatable implements CanResetPassword
             return ['*' => ['*']];
         }
 
-        $defaults = config('permissions.role_defaults.' . ($this->role?->name ?? ''), []);
+        $defaults = config('permissions.role_defaults.'.($this->role?->name ?? ''), []);
 
         if ($defaults === '*') {
             return ['*' => ['*']];
@@ -148,10 +148,25 @@ class User extends Authenticatable implements CanResetPassword
 
     public const STATUSES = ['Pending', 'Active', 'Banned'];
 
-    public function isPending(): bool { return $this->account_status === 'Pending'; }
-    public function isActive(): bool  { return $this->account_status === 'Active'; }
-    public function isBanned(): bool  { return $this->account_status === 'Banned'; }
-    public function isStudent(): bool { return $this->role?->name === 'Student'; }
+    public function isPending(): bool
+    {
+        return $this->account_status === 'Pending';
+    }
+
+    public function isActive(): bool
+    {
+        return $this->account_status === 'Active';
+    }
+
+    public function isBanned(): bool
+    {
+        return $this->account_status === 'Banned';
+    }
+
+    public function isStudent(): bool
+    {
+        return $this->role?->name === 'Student';
+    }
 
     /**
      * Whether an administrator has approved this account's verification.
@@ -164,7 +179,7 @@ class User extends Authenticatable implements CanResetPassword
      */
     public function isIdVerified(): bool
     {
-        if (!$this->isStudent()) {
+        if (! $this->isStudent()) {
             return true;
         }
 

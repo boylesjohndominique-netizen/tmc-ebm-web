@@ -6,6 +6,7 @@ use App\Models\BorrowingRequest;
 use App\Models\Equipment;
 use App\Models\Notification;
 use App\Models\ReturnRequest;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -339,7 +340,7 @@ class MobileController extends Controller
 
         $path = $side === 'front' ? $request->user()->id_front_path : $request->user()->id_back_path;
 
-        if (!$path || !Storage::disk('local')->exists($path)) {
+        if (! $path || ! Storage::disk('local')->exists($path)) {
             return response()->json(['message' => 'No ID photo submitted.'], 404);
         }
 
@@ -366,21 +367,86 @@ class MobileController extends Controller
     }
 
     /**
-     * Update profile details.
+     * Update profile details (and optionally student ID / profile photo).
      */
     public function updateProfile(Request $request)
     {
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
+            'id_number' => ['nullable', 'string', 'max:20', 'regex:/^\d{2}-\d{6}$/'],
             'contact_number' => ['nullable', 'string', 'max:30'],
+            'avatar' => ['nullable', 'image', 'max:5120'],
+            'remove_avatar' => ['nullable', 'boolean'],
         ]);
 
-        $request->user()->update($data);
+        unset($data['avatar'], $data['remove_avatar']);
+
+        $user = $request->user();
+
+        if ($request->hasFile('avatar')) {
+            if ($user->profile_photo_path && Storage::disk('local')->exists($user->profile_photo_path)) {
+                Storage::disk('local')->delete($user->profile_photo_path);
+            }
+            $data['profile_photo_path'] = $request->file('avatar')->store('user-avatars', 'local');
+        } elseif ($request->boolean('remove_avatar')) {
+            if ($user->profile_photo_path && Storage::disk('local')->exists($user->profile_photo_path)) {
+                Storage::disk('local')->delete($user->profile_photo_path);
+            }
+            $data['profile_photo_path'] = null;
+        }
+
+        $user->update($data);
+        $fresh = $user->fresh()->load('role');
 
         return response()->json([
             'message' => 'Profile updated successfully.',
-            'user' => $request->user()->fresh()->load('role'),
+            'user' => array_merge($fresh->toArray(), [
+                'is_id_verified' => $fresh->isIdVerified(),
+            ]),
+        ]);
+    }
+
+    /**
+     * Upload or replace the signed-in user's profile avatar directly.
+     */
+    public function updateAvatar(Request $request)
+    {
+        $request->validate([
+            'avatar' => ['required', 'image', 'max:5120'],
+        ]);
+
+        $user = $request->user();
+        if ($user->profile_photo_path && Storage::disk('local')->exists($user->profile_photo_path)) {
+            Storage::disk('local')->delete($user->profile_photo_path);
+        }
+
+        $path = $request->file('avatar')->store('user-avatars', 'local');
+        $user->update(['profile_photo_path' => $path]);
+        $fresh = $user->fresh()->load('role');
+
+        return response()->json([
+            'message' => 'Profile picture updated.',
+            'user' => array_merge($fresh->toArray(), [
+                'is_id_verified' => $fresh->isIdVerified(),
+            ]),
+        ]);
+    }
+
+    /**
+     * Stream a user profile avatar image.
+     */
+    public function userAvatar(string $filename)
+    {
+        $safe = basename($filename);
+        $path = 'user-avatars/'.$safe;
+
+        if (! Storage::disk('local')->exists($path)) {
+            return response()->json(['message' => 'Avatar not found.'], 404);
+        }
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Cache-Control' => 'public, max-age=86400',
         ]);
     }
 
@@ -394,7 +460,7 @@ class MobileController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        if (!\Hash::check($data['current_password'], $request->user()->password)) {
+        if (! \Hash::check($data['current_password'], $request->user()->password)) {
             return response()->json(['message' => 'Current password is incorrect.'], 422);
         }
 
@@ -403,5 +469,19 @@ class MobileController extends Controller
         ])->save();
 
         return response()->json(['message' => 'Password changed successfully.']);
+    }
+
+    /**
+     * Read-only system settings & platform policies authored by administrators.
+     */
+    public function settings()
+    {
+        $raw = Setting::get(Setting::PLATFORM_POLICIES);
+        $decoded = $raw ? json_decode($raw, true) : [];
+
+        return response()->json([
+            'overdue_fee_per_day' => (float) Setting::get(Setting::OVERDUE_FEE_PER_DAY, 0),
+            'platform_policies' => is_array($decoded) ? array_values($decoded) : [],
+        ]);
     }
 }
