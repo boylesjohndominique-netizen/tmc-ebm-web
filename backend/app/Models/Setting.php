@@ -13,6 +13,9 @@ class Setting extends Model
     /** Fee charged for every day a return is late (per-day rate). */
     public const OVERDUE_FEE_PER_DAY = 'overdue_fee_per_day';
 
+    /** JSON array of admin-authored platform policies (terms, privacy, etc.). */
+    public const PLATFORM_POLICIES = 'platform_policies';
+
     protected $fillable = ['key', 'value'];
 
     /** Read a setting value, falling back to the given default. */

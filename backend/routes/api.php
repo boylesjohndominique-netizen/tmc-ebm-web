@@ -318,6 +318,11 @@ Route::middleware('auth:sanctum')->group(function () {
                 'index'
             ])->middleware('perm:reports.view');
 
+            Route::get('/reports/export', [
+                ReportController::class,
+                'export'
+            ])->middleware('perm:reports.view');
+
 
             // System Settings (overdue fee, etc.)
             Route::get('/settings', [
@@ -328,6 +333,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/settings', [
                 SettingController::class,
                 'update'
+            ])->middleware('perm:settings.update');
+
+            Route::put('/settings/policies', [
+                SettingController::class,
+                'updatePolicies'
             ])->middleware('perm:settings.update');
 
 
