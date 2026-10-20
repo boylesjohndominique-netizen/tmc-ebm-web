@@ -36,6 +36,16 @@ Route::post('/register', [
     'register',
 ]);
 
+Route::post('/register/send-code', [
+    AuthController::class,
+    'sendRegistrationCode',
+]);
+
+Route::post('/register/verify-code', [
+    AuthController::class,
+    'verifyRegistrationCode',
+]);
+
 // =====================================================
 // EMAIL VERIFICATION ROUTES (PUBLIC)
 // =====================================================

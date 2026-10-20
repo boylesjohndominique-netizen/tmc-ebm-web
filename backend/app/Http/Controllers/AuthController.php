@@ -8,6 +8,7 @@ use App\Models\Notification;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 
@@ -182,9 +183,76 @@ class AuthController extends Controller
     }
 
     /**
+     * Step 3 of mobile registration wizard: sends a 6-digit verification code
+     * to a prospective student's email before account creation.
+     */
+    public function sendRegistrationCode(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:150', 'unique:users,email'],
+            'first_name' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $email = strtolower(trim($data['email']));
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        Cache::put("reg_email_otp:{$email}", $code, now()->addMinutes(15));
+
+        try {
+            Mail::to($email)->send(new VerificationCodeMail(
+                code: $code,
+                userName: trim($data['first_name'] ?? '') ?: 'Student',
+                verificationUrl: null,
+            ));
+        } catch (\Exception $e) {
+            \Log::error('Failed to send pre-registration verification email: '.$e->getMessage());
+        }
+
+        return response()->json([
+            'message' => 'A 6-digit verification code has been sent to your email.',
+        ]);
+    }
+
+    /**
+     * Step 3 of mobile registration wizard: verifies the 6-digit code sent to
+     * the prospective student's email before proceeding to the password step.
+     */
+    public function verifyRegistrationCode(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['required', 'string', 'size:6'],
+        ]);
+
+        $email = strtolower(trim($data['email']));
+        $cachedCode = Cache::get("reg_email_otp:{$email}");
+
+        if (! $cachedCode) {
+            return response()->json([
+                'message' => 'Verification code has expired or was not requested. Please request a new code.',
+            ], 422);
+        }
+
+        if ($cachedCode !== $data['code']) {
+            return response()->json([
+                'message' => 'Invalid verification code.',
+            ], 422);
+        }
+
+        Cache::forget("reg_email_otp:{$email}");
+        Cache::put("reg_email_verified:{$email}", true, now()->addMinutes(60));
+
+        return response()->json([
+            'message' => 'Email verified successfully.',
+            'verified' => true,
+        ]);
+    }
+
+    /**
      * Public self-registration (mobile app): creates a Pending Student
-     * account that an administrator must verify before login is allowed.
-     * Sends a 6-digit email verification code.
+     * account that an administrator must verify before borrowing is allowed.
+     * If the email was already verified in the registration wizard, issues an
+     * auth token immediately; otherwise sends a 6-digit verification code.
      */
     public function register(Request $request)
     {
@@ -197,11 +265,16 @@ class AuthController extends Controller
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'email_verified' => ['nullable', 'boolean'],
         ]);
 
         $studentRole = Role::where('name', 'Student')->firstOrFail();
 
-        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $normalizedEmail = strtolower(trim($data['email']));
+        $preVerified = Cache::pull("reg_email_verified:{$normalizedEmail}") === true
+            || $request->boolean('email_verified');
+
+        $code = $preVerified ? null : str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         $baseUsername = trim($data['username'] ?? '') !== ''
             ? trim($data['username'])
@@ -224,20 +297,23 @@ class AuthController extends Controller
             'contact_number' => $data['contact_number'] ?? null,
             'password' => $data['password'],
             'account_status' => 'Pending',
+            'email_verified_at' => $preVerified ? now() : null,
             'email_verification_code' => $code,
-            'email_code_expires_at' => now()->addMinutes(15),
+            'email_code_expires_at' => $preVerified ? null : now()->addMinutes(15),
         ]);
 
-        // Send verification email with code and one-click verification link
-        try {
-            $verificationUrl = url('/verify-email-link?email='.urlencode($user->email).'&code='.$code);
-            Mail::to($user->email)->send(new VerificationCodeMail(
-                code: $code,
-                userName: $user->first_name,
-                verificationUrl: $verificationUrl,
-            ));
-        } catch (\Exception $e) {
-            \Log::error('Failed to send verification email: '.$e->getMessage());
+        if (! $preVerified) {
+            // Send verification email with code and one-click verification link
+            try {
+                $verificationUrl = url('/verify-email-link?email='.urlencode($user->email).'&code='.$code);
+                Mail::to($user->email)->send(new VerificationCodeMail(
+                    code: $code,
+                    userName: $user->first_name,
+                    verificationUrl: $verificationUrl,
+                ));
+            } catch (\Exception $e) {
+                \Log::error('Failed to send verification email: '.$e->getMessage());
+            }
         }
 
         // Notify every administrator so someone verifies the new account.
@@ -251,6 +327,23 @@ class AuthController extends Controller
                     .'registered as a student and is awaiting verification.',
                 'type' => 'Registration',
             ]);
+        }
+
+        if ($preVerified) {
+            $token = $user->createToken('tmc-mobile')->plainTextToken;
+            $user->load('role');
+
+            return response()->json([
+                'message' => 'Registration successful. Welcome!',
+                'requires_email_verification' => false,
+                'token' => $token,
+                'user' => [
+                    ...$user->toArray(),
+                    'role_name' => $user->role?->name,
+                    'account_status' => $user->account_status,
+                    'is_id_verified' => $user->isIdVerified(),
+                ],
+            ], 201);
         }
 
         return response()->json([
