@@ -19,8 +19,6 @@ class ProcessPickupRequest extends FormRequest
             'status' => ['required', Rule::in(['Received', 'Rejected'])],
             'remarks' => ['required_if:status,Rejected', 'nullable', 'string', 'max:500'],
             'method' => ['required', Rule::in(['manual', 'qr'])],
-            'student_id_number' => ['required_if:status,Received', 'nullable', 'string', 'max:20'],
-            'equipment_checked' => ['required_if:status,Received', 'accepted_if:status,Received'],
         ];
     }
 }

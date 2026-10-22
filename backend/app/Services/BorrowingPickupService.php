@@ -30,8 +30,8 @@ class BorrowingPickupService
             abort_unless($borrowing->status === 'Approved' && $borrowing->pickup_status === 'Awaiting', 409,
                 'This receipt is not awaiting pickup or has already been processed.');
 
-            if ($data['method'] === 'qr' && (! str_starts_with($data['code'], 'TMCEBMS:') || $data['status'] !== 'Received')) {
-                throw ValidationException::withMessages(['code' => 'Scan the QR code on an approved receipt to confirm pickup.']);
+            if ($data['method'] === 'qr' && ! str_starts_with($data['code'], 'TMCEBMS:')) {
+                throw ValidationException::withMessages(['code' => 'Scan the QR code on an approved receipt to review pickup.']);
             }
 
             if ($data['status'] === 'Received') {
@@ -46,17 +46,13 @@ class BorrowingPickupService
                 }
             }
 
-            $verification = $data['status'] === 'Received'
-                ? app(HandoverVerificationService::class)->verify($borrowing->receipt_snapshot['borrower']['id_number'] ?? null, $data)
-                : [];
-
             $borrowing->update([
                 'status' => $data['status'] === 'Rejected' ? 'Rejected' : 'Approved',
                 'pickup_status' => $data['status'],
                 'pickup_processed_at' => now(),
                 'pickup_processed_by' => $staff->id,
                 'pickup_remarks' => $data['remarks'] ?? null,
-                'receipt_snapshot' => array_merge($borrowing->receipt_snapshot ?? [], $verification, [
+                'receipt_snapshot' => array_merge($borrowing->receipt_snapshot ?? [], [
                     'pickup_staff_name' => trim($staff->first_name.' '.$staff->last_name),
                     'pickup_method' => $data['method'],
                 ]),

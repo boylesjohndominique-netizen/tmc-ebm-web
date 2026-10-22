@@ -113,8 +113,10 @@ class BorrowingPickupTest extends TestCase
         Sanctum::actingAs($this->staff);
         $this->getJson('/api/admin/borrowings/receipt?code='.$borrowing->transaction_code)
             ->assertOk()->assertJsonPath('data.borrower.name', 'Student Tester');
-        $payload = ['code' => $borrowing->receipt['qr_payload'], 'status' => 'Received', 'method' => 'qr',
-            'student_id_number' => '24-123456', 'equipment_checked' => true];
+        $this->getJson('/api/admin/borrowings/receipt?code='.$borrowing->receipt['qr_payload'])
+            ->assertOk()->assertJsonPath('data.borrower.id_number', '24-123456');
+        $this->assertSame('Awaiting', $borrowing->fresh()->pickup_status);
+        $payload = ['code' => $borrowing->receipt['qr_payload'], 'status' => 'Received', 'method' => 'qr'];
         $this->postJson('/api/admin/borrowings/pickup', $payload)
             ->assertOk()->assertJsonPath('data.pickup_status', 'Received');
         $this->postJson('/api/admin/borrowings/pickup', $payload)->assertConflict();
@@ -135,7 +137,6 @@ class BorrowingPickupTest extends TestCase
         Sanctum::actingAs($this->staff);
         $this->postJson('/api/admin/borrowings/pickup', [
             'code' => $borrowing->transaction_code, 'status' => 'Received', 'method' => 'manual',
-            'student_id_number' => '24-123456', 'equipment_checked' => true,
         ])->assertOk()->assertJsonPath('data.pickup_status', 'Received');
     }
 
@@ -143,8 +144,7 @@ class BorrowingPickupTest extends TestCase
     {
         $borrowing = $this->approve($this->submit());
         Sanctum::actingAs($this->staff);
-        $scan = ['code' => $borrowing->receipt['qr_payload'], 'status' => 'Received', 'method' => 'qr',
-            'student_id_number' => '24-123456', 'equipment_checked' => true];
+        $scan = ['code' => $borrowing->receipt['qr_payload'], 'status' => 'Received', 'method' => 'qr'];
         $this->postJson('/api/admin/borrowings/pickup', $scan)->assertConflict();
         $this->travel(4)->hours();
         $this->postJson('/api/admin/borrowings/pickup', $scan)->assertConflict();
@@ -211,20 +211,36 @@ class BorrowingPickupTest extends TestCase
         $this->assertSame(5, $this->equipment->fresh()->available_quantity);
     }
 
-    public function test_pickup_requires_the_correct_student_and_staff_inspection(): void
+    public function test_pickup_uses_the_receipt_student_and_does_not_record_unperformed_checks(): void
     {
         $borrowing = $this->approve($this->submit());
         $this->travel(2)->hours();
         Sanctum::actingAs($this->staff);
-        $payload = ['code' => $borrowing->transaction_code, 'status' => 'Received', 'method' => 'manual'];
-        $this->postJson('/api/admin/borrowings/pickup', $payload)->assertUnprocessable();
-        $this->postJson('/api/admin/borrowings/pickup', $payload + [
+        $this->postJson('/api/admin/borrowings/pickup', [
+            'code' => $borrowing->transaction_code, 'status' => 'Received', 'method' => 'manual',
             'student_id_number' => 'WRONG-ID', 'equipment_checked' => true,
-        ])->assertUnprocessable();
-        $this->postJson('/api/admin/borrowings/pickup', $payload + [
-            'student_id_number' => '24-123456', 'equipment_checked' => false,
-        ])->assertUnprocessable();
-        $this->assertSame('Awaiting', $borrowing->fresh()->pickup_status);
+        ])->assertOk()->assertJsonPath('data.borrower.id_number', '24-123456')
+            ->assertJsonPath('data.pickup_status', 'Received');
+        $this->assertArrayNotHasKey('verified_student_id', $borrowing->fresh()->receipt_snapshot);
+        $this->assertArrayNotHasKey('equipment_checked', $borrowing->fresh()->receipt_snapshot);
         $this->assertSame(3, $this->equipment->fresh()->available_quantity);
+    }
+
+    public function test_staff_can_reject_a_reviewed_qr_receipt_and_release_stock_once(): void
+    {
+        $borrowing = $this->approve($this->submit());
+        Sanctum::actingAs($this->staff);
+        $this->getJson('/api/admin/borrowings/receipt?code='.$borrowing->receipt['qr_payload'])->assertOk();
+        $payload = [
+            'code' => $borrowing->receipt['qr_payload'], 'status' => 'Rejected', 'method' => 'qr',
+            'remarks' => 'Student could not collect the equipment.',
+        ];
+        $this->postJson('/api/admin/borrowings/pickup', $payload)->assertOk()
+            ->assertJsonPath('data.pickup_status', 'Rejected');
+        $this->assertSame('qr', $borrowing->fresh()->receipt_snapshot['pickup_method']);
+        $this->assertSame(5, $this->equipment->fresh()->available_quantity);
+        $this->postJson('/api/admin/borrowings/pickup', $payload)->assertConflict();
+        $this->assertSame(5, $this->equipment->fresh()->available_quantity);
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->student->id, 'title' => 'Equipment Pickup Rejected']);
     }
 }

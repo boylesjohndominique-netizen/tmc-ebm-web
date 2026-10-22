@@ -3726,22 +3726,98 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 
 .pickup-desk {
-  margin-block: 20px;
-  padding: 18px;
+  min-width: 0;
+  margin-block: 24px;
+  padding: 24px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
+  border-radius: 18px;
+  background: var(--page);
 }
 
-.pickup-desk h2 { margin-top: 0; }
-.pickup-desk label { display: grid; gap: 6px; }
-.pickup-desk .toolbar { align-items: end; flex-wrap: wrap; }
-.pickup-desk input { max-width: 100%; }
-.pickup-desk textarea { width: 100%; }
-.pickup-receipt { overflow-wrap: anywhere; }
-.receipt-camera { width: 100%; max-height: 380px; border-radius: 10px; }
-.pickup-desk .handover-check { display: flex; align-items: start; gap: 10px; margin-block: 14px; }
-.pickup-desk .handover-check input { width: 18px; height: 18px; flex-shrink: 0; }
-.return-question { display: flex; gap: 20px; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-block: 14px; }
-.pickup-desk .return-question label { display: flex; gap: 8px; align-items: center; }
-.pickup-desk .return-question input { width: 18px; height: 18px; }
+.receipt-desk-heading { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 20px; }
+.receipt-desk-heading h2 { margin: 0 0 6px; font-size: 19px; line-height: 1.35; }
+.receipt-desk-heading p { margin: 0; color: var(--text-soft); font-size: 13px; max-width: 720px; }
+.receipt-desk-icon { display: grid; place-items: center; flex: 0 0 44px; height: 44px; border-radius: 13px; background: var(--blue-light); color: var(--blue); }
+.receipt-lookup { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 18px; margin-bottom: 18px; border: 1px solid var(--border-soft); border-radius: 14px; background: var(--card); }
+.receipt-lookup-field { display: grid; gap: 7px; min-width: 0; }
+.receipt-lookup-field label { margin: 0; }
+.receipt-lookup-field small, .receipt-help { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.receipt-help { margin: 12px 0 0; }
+.receipt-lookup .btn { white-space: nowrap; min-height: 44px; }
+.pickup-desk label { display: grid; gap: 8px; margin-bottom: 0; }
+.pickup-desk input, .pickup-desk select, .pickup-desk textarea { width: 100%; min-width: 0; max-width: 100%; margin-bottom: 0; }
+.pickup-desk textarea { resize: vertical; min-height: 92px; }
+.receipt-empty { display: flex; gap: 14px; align-items: center; padding: 22px 8px 6px; color: var(--muted); }
+.receipt-empty > svg { flex-shrink: 0; }
+.receipt-empty b { color: var(--text-soft); font-size: 13px; }
+.receipt-empty p { margin: 4px 0 0; font-size: 12px; }
+.receipt-progress { color: var(--text-soft); font-size: 13px; }
+.receipt-review-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.receipt-summary, .receipt-decision { min-width: 0; padding: 20px; border: 1px solid var(--border-soft); border-radius: 14px; background: var(--card); overflow-wrap: anywhere; }
+.receipt-section-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; }
+.receipt-step { display: block; margin-bottom: 5px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.receipt-summary h3, .receipt-decision h3 { margin: 0; font-size: 16px; line-height: 1.45; }
+.receipt-number { display: block; font-size: 18px; font-variant-numeric: tabular-nums; letter-spacing: .03em; color: var(--blue); }
+.receipt-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+.receipt-facts div, .receipt-notes div { min-width: 0; }
+.receipt-facts dt, .receipt-notes dt { font-size: 11px; font-weight: 600; color: var(--muted); }
+.receipt-facts dd, .receipt-notes dd { margin: 4px 0 0; font-size: 13px; color: var(--text); }
+.receipt-window { display: flex; gap: 10px; padding: 13px; border: 1px solid var(--border); border-radius: 11px; background: var(--page); color: var(--text-soft); }
+.receipt-window > svg { flex-shrink: 0; margin-top: 2px; }
+.receipt-window b { font-size: 12px; }
+.receipt-window p { margin: 4px 0; font-size: 12px; }
+.receipt-window span { font-size: 11px; font-weight: 600; }
+.receipt-window.is-open { background: var(--success-soft); border-color: transparent; }
+.receipt-window.is-open > svg, .receipt-window.is-open span { color: var(--success); }
+.receipt-items-heading { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; font-size: 13px; }
+.receipt-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.receipt-items li { padding: 13px; border: 1px solid var(--border-soft); border-radius: 10px; }
+.receipt-item-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; font-size: 13px; }
+.receipt-quantity { flex-shrink: 0; padding: 3px 8px; border-radius: 7px; background: var(--blue-light); color: var(--blue); font-size: 11px; font-weight: 700; }
+.receipt-items p { margin: 6px 0 0; font-size: 12px; color: var(--text-soft); }
+.receipt-items .receipt-item-meta { color: var(--muted); font-size: 11px; }
+.receipt-notes { display: grid; gap: 14px; margin: 18px 0 0; }
+.receipt-decision > .receipt-help { margin-bottom: 18px; }
+.receipt-form-section { display: grid; gap: 12px; border-top: 1px solid var(--border-soft); margin-top: 18px; padding-top: 18px; }
+.receipt-form-section h4 { margin: 0; font-size: 13px; }
+.receipt-form-section .receipt-help { margin: 0; }
+.pickup-desk .handover-check { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; font-size: 12px; font-weight: 400; color: var(--text-soft); line-height: 1.6; }
+.pickup-desk .handover-check input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; }
+.return-question { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; border: 0; padding: 0; margin: 0; }
+.return-question legend { padding: 0; margin-bottom: 10px; font-size: 13px; font-weight: 700; color: var(--text); }
+.pickup-desk .return-question label { display: flex; flex-direction: row; flex: 1 1 150px; gap: 8px; align-items: center; min-height: 44px; padding: 10px; border: 1px solid var(--border); border-radius: 9px; font-size: 12px; color: var(--text-soft); cursor: pointer; }
+.pickup-desk .return-question label.is-selected { background: var(--blue-light); border-color: var(--blue); color: var(--blue); }
+.pickup-desk .return-question input { width: 17px; height: 17px; flex-shrink: 0; }
+.pickup-desk input[type="checkbox"], .pickup-desk input[type="radio"] { padding: 0; box-shadow: none; accent-color: var(--blue); }
+.receipt-fee { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px; border-radius: 10px; background: var(--success-soft); }
+.receipt-fee.has-fee { background: var(--warning-soft); }
+.receipt-fee b, .receipt-fee span { display: block; font-size: 12px; }
+.receipt-fee span { margin-top: 4px; color: var(--text-soft); font-size: 11px; }
+.receipt-fee strong { font-size: 21px; font-variant-numeric: tabular-nums; color: var(--text); }
+.receipt-callout { padding: 12px; margin: 14px 0; border-radius: 9px; background: var(--warning-soft); color: var(--warning); font-size: 12px; line-height: 1.6; }
+.receipt-decision-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.receipt-decision-actions .btn { min-height: 44px; white-space: normal; text-align: center; }
+.receipt-camera { display: block; width: 100%; max-height: 380px; border-radius: 12px; }
+
+@media (max-width: 1100px) {
+  .receipt-review-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .pickup-desk { padding: 16px; border-radius: 14px; }
+  .receipt-lookup { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px; }
+  .receipt-lookup-field { grid-column: 1 / -1; }
+  .receipt-lookup .btn { white-space: normal; }
+  .receipt-summary, .receipt-decision { padding: 16px; }
+}
+
+@media (max-width: 480px) {
+  .pickup-desk { padding: 12px; }
+  .receipt-desk-icon { display: none; }
+  .receipt-desk-heading h2 { font-size: 17px; }
+  .receipt-lookup, .receipt-decision-actions, .receipt-facts { grid-template-columns: minmax(0, 1fr); }
+  .receipt-facts { gap: 12px; }
+  .receipt-summary, .receipt-decision { padding: 14px; }
+  .receipt-review-layout { gap: 12px; }
+  .receipt-empty { align-items: flex-start; }
+}

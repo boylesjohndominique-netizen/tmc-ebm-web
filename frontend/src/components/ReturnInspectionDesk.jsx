@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { FileSearch, RotateCcw } from 'lucide-react';
 import api from '../services/api';
 import Modal from './Modal';
 import ReceiptQrScanner from './ReceiptQrScanner';
-import { fmtCurrency, fmtDate, fmtDateTime } from '../utils/datetime';
+import { ReceiptLookup, ReceiptSummary } from './ReceiptReview';
+import { fmtCurrency, fmtDateTime } from '../utils/datetime';
 
 export default function ReturnInspectionDesk({ onProcessed }) {
   const [code, setCode] = useState('');
@@ -72,57 +74,67 @@ export default function ReturnInspectionDesk({ onProcessed }) {
   };
 
   return <section className="pickup-desk" aria-label="Equipment return inspection">
-    <h2>Equipment return inspection</h2>
-    <p>Find or scan the student's receipt, inspect the equipment and record any overdue-fee payment. Your decision goes to the admin for final verification.</p>
-    <form className="toolbar" onSubmit={event => { event.preventDefault(); findReceipt(code); }}>
-      <label>Return receipt number <input value={code} onChange={event => { setCode(event.target.value); setReceipt(null); }} inputMode="numeric" pattern="[0-9]{12}" maxLength={12} required disabled={busy} placeholder="12-digit return receipt number" /></label>
-      <button className="btn btn-secondary" disabled={busy}>Find return receipt</button>
-      <button type="button" className="btn btn-primary" disabled={busy} onClick={() => { setError(''); setScanning(true); }}>Scan return QR</button>
-    </form>
+    <div className="receipt-desk-heading"><span className="receipt-desk-icon"><RotateCcw size={23} /></span><div><h2>Equipment return inspection</h2><p>Find the return receipt, record your inspection and payment findings, then send your decision for admin verification.</p></div></div>
+    <ReceiptLookup isReturn code={code} onChange={value => { setCode(value); setReceipt(null); }} onSubmit={event => { event.preventDefault(); findReceipt(code); }} onScan={() => { setError(''); setScanning(true); }} busy={busy} />
     {error && <div className="alert error" role="alert">{error}</div>}
-    {notice && <p role="status">{notice}</p>}
-    {busy && <p role="status">Processing return receipt…</p>}
-    {receipt && <div className="pickup-receipt">
-      <h3>Return receipt {receipt.transaction_code}</h3>
-      <p><b>Student:</b> {receipt.borrower?.name} · {receipt.borrower?.id_number || 'No student ID recorded'}</p>
-      <p><b>Expected return:</b> {fmtDate(receipt.expected_return_date)}</p>
-      <p><b>Return window:</b> {fmtDateTime(receipt.handover_starts_at)} – {fmtDateTime(receipt.handover_ends_at)}</p>
-      <ul>{receipt.items?.map(item => <li key={item.equipment_id}><b>{item.name} × {item.quantity}</b> · Equipment #{item.equipment_id}{item.description && <p>{item.description}</p>}{item.pickup_location && <p><b>School pickup location:</b> {item.pickup_location}</p>}</li>)}</ul>
-      <p><b>Status:</b> {receipt.status} · <b>Staff decision:</b> {receipt.handover_status}</p>
+    {notice && <div className="alert success" role="status">{notice}</div>}
+    {busy && <p className="receipt-progress" role="status">Processing return receipt…</p>}
+    {!receipt && !busy && <div className="receipt-empty"><FileSearch size={26} /><div><b>Find a return receipt to get started</b><p>Inspection and payment questions will appear after you open a receipt.</p></div></div>}
+    {receipt && <div className="receipt-review-layout">
+      <ReceiptSummary receipt={receipt} isReturn awaiting={awaiting} inWindow={inWindow} />
+      <section className="receipt-decision" aria-label="Return inspection findings">
       {awaiting ? <>
-        <label>Student ID presented <input value={studentId} maxLength={20} onChange={event => setStudentId(event.target.value)} disabled={busy} placeholder="ID on the physical student card" /></label>
-        <label className="handover-check"><input type="checkbox" checked={checked} onChange={event => setChecked(event.target.checked)} disabled={busy} />I verified the student's identity and inspected all equipment, quantities and accessories.</label>
+        <span className="receipt-step">Inspection findings</span><h3>Review the return</h3>
+        <p className="receipt-help">Complete each section below. An administrator will verify your decision before the loan is closed.</p>
+        <div className="receipt-form-section">
+        <h4>Student and equipment check</h4>
+        <label>Student ID presented<input value={studentId} maxLength={20} onChange={event => setStudentId(event.target.value)} disabled={busy} placeholder="ID on the physical student card" /></label>
+        <label className="handover-check"><input type="checkbox" checked={checked} onChange={event => setChecked(event.target.checked)} disabled={busy} /><span>I verified the student's identity and inspected the equipment, quantities and accessories.</span></label>
+        </div>
+        <div className="receipt-form-section">
         <fieldset className="return-question"><legend>Is the equipment in good condition?</legend>
-          <label><input type="radio" name="return-condition" checked={condition === 'Good'} onChange={() => { setCondition('Good'); setConditionNotes(''); }} disabled={busy} />Yes</label>
-          <label><input type="radio" name="return-condition" checked={condition !== '' && condition !== 'Good'} onChange={() => setCondition('Damaged')} disabled={busy} />No</label>
+          <label className={condition === 'Good' ? 'is-selected' : ''}><input type="radio" name="return-condition" checked={condition === 'Good'} onChange={() => { setCondition('Good'); setConditionNotes(''); }} disabled={busy} />Yes, good condition</label>
+          <label className={condition !== '' && condition !== 'Good' ? 'is-selected' : ''}><input type="radio" name="return-condition" checked={condition !== '' && condition !== 'Good'} onChange={() => setCondition('Damaged')} disabled={busy} />No, there is a problem</label>
         </fieldset>
         {condition !== '' && condition !== 'Good' && <>
           <label>Problem type <select value={condition} onChange={event => setCondition(event.target.value)} disabled={busy}>
             <option value="Damaged">Damaged equipment</option><option value="Incomplete">Missing equipment or accessories</option>
             <option value="NotPresented">Equipment not presented</option><option value="Other">Other problem</option>
           </select></label>
-          <label>Describe the problem (required)<textarea value={conditionNotes} onChange={event => setConditionNotes(event.target.value)} maxLength={1000} disabled={busy} /></label>
+          <label>Describe the problem (required)<textarea value={conditionNotes} onChange={event => setConditionNotes(event.target.value)} maxLength={1000} disabled={busy} rows={3} placeholder="Describe the damage, missing accessories, or other issue." /></label>
         </>}
-        <p><b>Overdue fee:</b> {fmtCurrency(fee)} {days > 0 && `(${days} day(s) past the expected return date)`}</p>
+        </div>
+        <div className="receipt-form-section">
+        <div className={`receipt-fee ${fee > 0 ? 'has-fee' : ''}`}><div><b>Overdue fee</b><span>{days > 0 ? `${days} day(s) overdue` : 'No overdue payment required'}</span></div><strong>{fmtCurrency(fee)}</strong></div>
         {fee > 0 ? <fieldset className="return-question"><legend>Has the student paid {fmtCurrency(fee)}?</legend>
-          <label><input type="radio" name="return-payment" checked={paid === 'yes'} onChange={() => setPaid('yes')} disabled={busy} />Yes, paid</label>
-          <label><input type="radio" name="return-payment" checked={paid === 'no'} onChange={() => setPaid('no')} disabled={busy} />No, not paid</label>
-        </fieldset> : <p>No overdue payment is required.</p>}
-        <button type="button" className="btn btn-secondary small" disabled={busy} onClick={() => findReceipt(receipt.transaction_code)}>Refresh fee and inspection form</button>
-        <label>Decision notes / rejection reason<textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={500} disabled={busy} placeholder="For example: broken lens, or overdue fee not paid" /></label>
-        {condition !== '' && condition !== 'Good' && <p role="status">Equipment problems must be resolved before the return can be accepted.</p>}
-        {fee > 0 && paid === 'no' && <p role="status">An unpaid overdue fee prevents acceptance. Submit a rejection for the admin to review.</p>}
-        {!inWindow && <p role="status">Acceptance is available during the approved return window.</p>}
-        <div className="toolbar">
-          <button type="button" className="btn btn-primary" disabled={busy || !canAccept} onClick={() => submit('Accepted')}>Accept return for admin verification</button>
-          <button type="button" className="btn btn-danger" disabled={busy || !findingsReady || !rejectionReason} onClick={() => submit('Rejected')}>Reject return for admin verification</button>
+          <label className={paid === 'yes' ? 'is-selected' : ''}><input type="radio" name="return-payment" checked={paid === 'yes'} onChange={() => setPaid('yes')} disabled={busy} />Yes, paid</label>
+          <label className={paid === 'no' ? 'is-selected' : ''}><input type="radio" name="return-payment" checked={paid === 'no'} onChange={() => setPaid('no')} disabled={busy} />No, not paid</label>
+        </fieldset> : null}
+        <button type="button" className="btn btn-secondary small" disabled={busy} onClick={() => findReceipt(method === 'qr' ? receipt.qr_payload : receipt.transaction_code, method)}><RotateCcw size={14} /> Refresh fee</button>
+        <p className="receipt-help">Refreshing also resets the inspection answers.</p>
+        </div>
+        <div className="receipt-form-section">
+        <label>Decision notes / rejection reason<textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={500} disabled={busy} rows={3} placeholder="Add instructions or explain why the return cannot be accepted." /></label>
+        {condition !== '' && condition !== 'Good' && <p className="receipt-callout" role="status">Equipment problems must be resolved before the return can be accepted.</p>}
+        {fee > 0 && paid === 'no' && <p className="receipt-callout" role="status">The overdue fee is unpaid. Submit a rejection for admin review.</p>}
+        {!inWindow && <p className="receipt-callout" role="status">Acceptance is available during the approved return window.</p>}
+        <div className="receipt-decision-actions">
+          <button type="button" className="btn btn-primary" disabled={busy || !canAccept} onClick={() => submit('Accepted')}>Accept return</button>
+          <button type="button" className="btn btn-danger" disabled={busy || !findingsReady || !rejectionReason} onClick={() => submit('Rejected')}>Reject return</button>
+        </div>
+        <p className="receipt-help">Both decisions are sent to an administrator for final verification.</p>
         </div>
       </> : <>
-        <p><b>Condition:</b> {receipt.condition_on_return || 'Not assessed'} {receipt.condition_notes && `— ${receipt.condition_notes}`}</p>
-        <p><b>Overdue fee:</b> {fmtCurrency(fee)} · {receipt.payment_status}</p>
-        <p><b>Staff reason:</b> {receipt.handover_remarks || '—'}</p>
-        {receipt.admin_verified_at && <p><b>Admin verified:</b> {fmtDateTime(receipt.admin_verified_at)} · {receipt.admin_remarks || '—'}</p>}
+        <span className="receipt-step">Inspection record</span><h3>{receipt.status === 'Awaiting Verification' ? 'Sent for admin verification' : 'Return reviewed'}</h3>
+        <dl className="receipt-notes">
+          <div><dt>Staff decision</dt><dd>{receipt.handover_status}</dd></div>
+          <div><dt>Condition</dt><dd>{receipt.condition_on_return || 'Not assessed'}{receipt.condition_notes && ` — ${receipt.condition_notes}`}</dd></div>
+          <div><dt>Overdue fee</dt><dd>{fmtCurrency(fee)} · {receipt.payment_status || 'Not recorded'}</dd></div>
+          <div><dt>Staff reason</dt><dd>{receipt.handover_remarks || '—'}</dd></div>
+          {receipt.admin_verified_at && <div><dt>Admin verified</dt><dd>{fmtDateTime(receipt.admin_verified_at)} · {receipt.admin_remarks || '—'}</dd></div>}
+        </dl>
       </>}
+      </section>
     </div>}
     <Modal open={scanning} title="Scan return receipt" onClose={() => setScanning(false)}>
       {scanning && <ReceiptQrScanner message="Scanning opens the return receipt. Inspect the equipment and record payment before submitting your decision." onScan={value => findReceipt(value, 'qr')} />}
