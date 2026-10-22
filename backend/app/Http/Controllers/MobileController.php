@@ -180,7 +180,7 @@ class MobileController extends Controller
             $borrowing = BorrowingRequest::lockForUpdate()->findOrFail($borrowing->id);
             abort_unless($borrowing->status === 'Approved' && $borrowing->pickup_status === 'Received', 422,
                 'Equipment must be received from staff before requesting a return.');
-            abort_if($borrowing->returns()->whereIn('status', ['Pending', 'Approved'])->exists(), 422,
+            abort_if($borrowing->returns()->whereIn('status', ['Pending', 'Approved', 'Awaiting Verification'])->exists(), 422,
                 'A return request is already awaiting admin review or staff inspection.');
 
             return ReturnRequest::create([

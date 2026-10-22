@@ -13,6 +13,7 @@ class ReturnRequest extends Model
         'overdue_days', 'overdue_fee', 'transaction_code', 'qr_token', 'receipt_snapshot',
         'approved_at', 'handover_starts_at', 'handover_ends_at', 'handover_status',
         'handover_processed_at', 'handover_processed_by', 'handover_remarks',
+        'condition_notes', 'overdue_fee_paid', 'admin_verified_at', 'admin_verified_by', 'admin_remarks',
     ];
 
     protected $casts = [
@@ -24,11 +25,13 @@ class ReturnRequest extends Model
         'handover_starts_at' => 'datetime',
         'handover_ends_at' => 'datetime',
         'handover_processed_at' => 'datetime',
+        'overdue_fee_paid' => 'boolean',
+        'admin_verified_at' => 'datetime',
     ];
 
     protected $hidden = ['qr_token', 'receipt_snapshot'];
 
-    protected $appends = ['receipt'];
+    protected $appends = ['receipt', 'payment_status'];
 
     protected static function booted(): void
     {
@@ -64,7 +67,29 @@ class ReturnRequest extends Model
             'returned_at' => $this->returned_at?->toISOString(),
             'overdue_days' => $this->overdue_days,
             'overdue_fee' => $this->overdue_fee,
+            'condition_notes' => $this->condition_notes,
+            'overdue_fee_paid' => $this->overdue_fee_paid,
+            'payment_status' => $this->payment_status,
+            'admin_verified_at' => $this->admin_verified_at?->toISOString(),
+            'admin_remarks' => $this->admin_remarks,
         ]);
+    }
+
+    public function getPaymentStatusAttribute(): string
+    {
+        if (! $this->handover_processed_at && ! $this->returned_at) {
+            return 'Not assessed';
+        }
+        if ((float) $this->overdue_fee <= 0) {
+            return 'Not required';
+        }
+
+        return $this->overdue_fee_paid === null ? 'Not recorded' : ($this->overdue_fee_paid ? 'Paid' : 'Not paid');
+    }
+
+    public function adminVerifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'admin_verified_by');
     }
 
     public function handoverProcessor(): BelongsTo

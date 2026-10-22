@@ -10,7 +10,7 @@ import EmptyState from '../../components/EmptyState';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
 import useRealtimeResource from '../../hooks/useRealtimeResource';
 import { fmtCurrency } from '../../utils/datetime';
-import BorrowingPickupDesk from '../../components/BorrowingPickupDesk';
+import ReturnInspectionDesk from '../../components/ReturnInspectionDesk';
 
 export default function ReturnRequests() {
   const { can } = useAuth();
@@ -54,7 +54,7 @@ export default function ReturnRequests() {
   const clearFilters = () => { setSearch(''); setStatusFilter('All'); };
   const statuses = [...new Set(items.map(x => x.status))]; // statuses actually present
 
-  const open = (x, mode) => { setSelected(x); setAction(mode); setRemarks(''); setModalError(''); setHandoverStart(''); setHandoverEnd(''); };
+  const open = (x, mode) => { setSelected(x); setAction(mode); setRemarks(x.status === 'Awaiting Verification' && mode === 'Rejected' ? x.handover_remarks || '' : ''); setModalError(''); setHandoverStart(''); setHandoverEnd(''); };
   const close = () => { if (!busy) { setSelected(null); setAction(null); setRemarks(''); setModalError(''); } };
 
   const submit = async () => {
@@ -76,13 +76,14 @@ export default function ReturnRequests() {
   };
 
   const isReject = action === 'Rejected';
+  const isVerification = selected?.status === 'Awaiting Verification';
   const borrowing = selected?.borrowing;
   const itemCount = borrowing?.items?.length ?? 0;
 
   return (
     <div className="panel">
       <h1>Return Requests</h1>
-      {can('returns', 'handover') && <BorrowingPickupDesk onProcessed={load} isReturn />}
+      {can('returns', 'handover') && <ReturnInspectionDesk onProcessed={load} />}
       {error && <div className="alert error">{error}</div>}
       {loading && !error && <Skeleton rows={4} />}
       {!loading && !error && (items.length
@@ -97,26 +98,32 @@ export default function ReturnRequests() {
           {hasFilters && <button className="btn btn-secondary small" onClick={clearFilters}>Clear</button>}
         </div>
         <div className="table-wrap"><table>
-          <thead><tr><th>ID</th><th>User</th><th>Borrowing</th><th>Condition</th><th>Overdue Fee</th><th>Status</th><th>Action</th></tr></thead>
+          <thead><tr><th>ID</th><th>User</th><th>Borrowing</th><th>Condition / Problem</th><th>Overdue Fee</th><th>Payment</th><th>Staff Decision / Reason</th><th>Status</th><th>Action</th></tr></thead>
           <tbody>
             {filtered.map(x => (
               <tr key={x.id}>
                 <td>#{x.id}<br/><small>{x.transaction_code}</small></td>
                 <td>{x.user?.first_name} {x.user?.last_name}</td>
                 <td>#{x.borrowing_request_id}</td>
-                <td>{x.condition_on_return || '—'}</td>
+                <td>{x.condition_on_return || 'Not assessed'}{x.condition_notes && <div>{x.condition_notes}</div>}</td>
                 <td>{x.overdue_fee > 0 ? `${fmtCurrency(x.overdue_fee)} · ${x.overdue_days}d` : '—'}</td>
-                <td><StatusBadge status={x.status} />{x.handover_status && <div className="muted">Staff: {x.handover_status}</div>}</td>
+                <td>{x.payment_status}</td>
+                <td>{x.handover_status || 'Awaiting inspection'}{x.handover_remarks && <div>{x.handover_remarks}</div>}{x.handover_processor && <small>{x.handover_processor.first_name} {x.handover_processor.last_name}</small>}</td>
+                <td><StatusBadge status={x.status} />{x.admin_verified_at && <div className="muted">Admin verified</div>}</td>
                 <td>
                   {x.status === 'Pending' && can('returns', 'process') && <>
                     <button className="btn btn-primary small" disabled={busy} onClick={() => open(x, 'Approved')}>Approve receipt</button>{' '}
                     <button className="btn btn-danger small" disabled={busy} onClick={() => open(x, 'Rejected')}>Reject</button>
                   </>}
                   {x.status === 'Pending' && !can('returns', 'process') && <span className="muted">Awaiting review</span>}
+                  {x.status === 'Awaiting Verification' && (can('returns', 'process') ? <>
+                    <button className="btn btn-primary small" disabled={busy} onClick={() => open(x, x.handover_status === 'Accepted' ? 'Confirmed' : 'Rejected')}>Verify staff decision</button>
+                    {x.handover_status === 'Accepted' && <button className="btn btn-danger small" disabled={busy} onClick={() => open(x, 'Rejected')}>Reject verification</button>}
+                  </> : <span className="muted">Awaiting admin verification</span>)}
                 </td>
               </tr>
             ))}
-            {!filtered.length && <tr className="empty"><td colSpan="7">No return requests match your filters.</td></tr>}
+            {!filtered.length && <tr className="empty"><td colSpan="9">No return requests match your filters.</td></tr>}
           </tbody>
         </table></div>
         </>
@@ -128,12 +135,12 @@ export default function ReturnRequests() {
         onClose={close}
         tone={isReject ? 'danger' : 'primary'}
         icon={isReject ? XCircle : CheckCircle2}
-        title={`Return #${selected?.id} — ${isReject ? 'Reject' : 'Approve receipt'}`}
-        submitLabel={isReject ? 'Reject Return' : 'Approve Return Receipt'}
+        title={`Return #${selected?.id} — ${isVerification ? 'Verify staff decision' : isReject ? 'Reject' : 'Approve receipt'}`}
+        submitLabel={isVerification ? (isReject ? 'Verify rejection' : 'Verify and complete return') : isReject ? 'Reject Return' : 'Approve Return Receipt'}
         busyLabel={isReject ? 'Rejecting…' : 'Confirming…'}
         onSubmit={submit}
         busy={busy}
-        disableSubmit={isReject ? !remarks.trim() : (!handoverStart || !handoverEnd || new Date(handoverEnd) <= new Date(handoverStart))}
+        disableSubmit={isReject ? !remarks.trim() : !isVerification && (!handoverStart || !handoverEnd || new Date(handoverEnd) <= new Date(handoverStart))}
       >
         {selected && (
           <div className="modal-body">
@@ -159,18 +166,25 @@ export default function ReturnRequests() {
             {selected.condition_on_return && (
               <p><b>Condition reported:</b> {selected.condition_on_return}</p>
             )}
+            {isVerification && <>
+              {selected.condition_notes && <p><b>Equipment problem:</b> {selected.condition_notes}</p>}
+              <p><b>Overdue fee:</b> {fmtCurrency(selected.overdue_fee)} · {selected.payment_status}</p>
+              <p><b>Staff decision:</b> {selected.handover_status}</p>
+              <p><b>Staff reason:</b> {selected.handover_remarks || '—'}</p>
+              <p>{isReject ? 'Verifying this rejection leaves the loan open and stock reserved.' : 'Verification restores stock and completes the loan. The overdue fee remains the amount assessed by staff.'}</p>
+            </>}
 
             {selected.returned_at && (
               <p><b>Returned at:</b> {new Date(selected.returned_at).toLocaleString()}</p>
             )}
 
-            {!isReject && <>
+            {action === 'Approved' && <>
               <label>Return window starts <input type="datetime-local" value={handoverStart} onChange={event => setHandoverStart(event.target.value)} required /></label>
               <label>Return window ends <input type="datetime-local" value={handoverEnd} min={handoverStart} onChange={event => setHandoverEnd(event.target.value)} required /></label>
             </>}
             {(
               <label>
-                {isReject ? 'Reason (required)' : 'Return instructions (optional)'} <span className="muted">(shown to the borrower)</span>
+                {isReject ? 'Reason (required)' : isVerification ? 'Verification notes (optional)' : 'Return instructions (optional)'} <span className="muted">(shown to the borrower)</span>
                 <textarea
                   value={remarks}
                   onChange={e => setRemarks(e.target.value)}
@@ -180,7 +194,7 @@ export default function ReturnRequests() {
               </label>
             )}
 
-            {!isReject && (
+            {action === 'Approved' && (
               <div className="alert success" style={{ marginTop: 10 }}>
                 Approval issues a receipt for {itemCount || 'the'} item{itemCount === 1 ? '' : 's'}. Staff must verify the student and inspect the equipment before restocking or closing the loan.
               </div>

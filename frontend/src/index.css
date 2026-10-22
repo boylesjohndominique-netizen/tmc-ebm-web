@@ -3730,3 +3730,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .receipt-camera { width: 100%; max-height: 380px; border-radius: 10px; }
 .pickup-desk .handover-check { display: flex; align-items: start; gap: 10px; margin-block: 14px; }
 .pickup-desk .handover-check input { width: 18px; height: 18px; flex-shrink: 0; }
+.return-question { display: flex; gap: 20px; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-block: 14px; }
+.pickup-desk .return-question label { display: flex; gap: 8px; align-items: center; }
+.pickup-desk .return-question input { width: 18px; height: 18px; }

@@ -13,7 +13,7 @@ class ReturnManagementController extends Controller
 {
     public function index()
     {
-        return response()->json(ReturnRequest::with(['user', 'borrowing.items.equipment', 'handoverProcessor'])->latest()->get());
+        return response()->json(ReturnRequest::with(['user', 'borrowing.items.equipment', 'handoverProcessor', 'adminVerifier'])->latest()->get());
     }
 
     public function process(ProcessReturnRequest $request, ReturnRequest $returnRequest, ReturnApprovalService $service)
@@ -34,7 +34,11 @@ class ReturnManagementController extends Controller
         }
 
         return response()->json([
-            'message' => $data['status'] === 'Approved' ? 'Return approved. Receipt issued; staff inspection is required before restocking.' : 'Return request rejected.',
+            'message' => match ($data['status']) {
+                'Approved' => 'Return approved. Receipt issued; staff inspection and final admin verification are required.',
+                'Confirmed' => 'Staff inspection verified. Return completed and stock restored.',
+                default => 'Return rejected. The loan remains open.',
+            },
             'data' => $updated->load(['user', 'borrowing.items.equipment', 'processor']),
         ]);
     }

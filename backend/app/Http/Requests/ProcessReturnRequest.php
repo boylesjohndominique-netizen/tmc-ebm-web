@@ -15,7 +15,7 @@ class ProcessReturnRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['required', Rule::in(['Approved', 'Rejected'])],
+            'status' => ['required', Rule::in(['Approved', 'Confirmed', 'Rejected'])],
             'remarks' => ['required_if:status,Rejected', 'nullable', 'string', 'max:500'],
             'handover_starts_at' => ['required_if:status,Approved', 'nullable', 'date', 'after_or_equal:now'],
             'handover_ends_at' => ['required_if:status,Approved', 'nullable', 'date', 'after:handover_starts_at'],

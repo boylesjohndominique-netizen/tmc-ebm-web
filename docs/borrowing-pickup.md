@@ -6,15 +6,25 @@
 4. Staff reject missed pickups manually with a reason. Rejection releases reserved stock and notifies both the student and administrators. A receipt can be processed once; repeated or expired scans cannot confirm pickup.
 5. Students can request returns only after staff confirm receipt.
 
+## Equipment pickup location and loan duration
+
+In **Equipment → Add Equipment / Edit**, set the school pickup location (for example, AV Office, Building A, Room 102). Students see it in equipment details and the request form. Approval saves that location in the receipt, including PNG/PDF exports, so later equipment edits do not change an issued receipt.
+
+Set the minimum and maximum borrowing days to limit the loan duration. Both limits are inclusive: 10–15 days permits a return date 10 through 15 calendar days after the borrowing date. For example, borrowing on October 24 permits returning November 3–8. Setting both limits to 10 allows exactly ten days. Leave both fields empty to remove duration restrictions. Existing equipment has no duration restriction until an admin configures it.
+
+Students choose a borrowing date starting today (Philippine time); the return-date picker then allows only dates within the duration limits. Changing the borrowing date clears an incompatible return date. The API checks the duration at submission and again at approval; changed limits may make a pending request ineligible for approval. Existing approved loans retain their issued receipts and return deadlines. The earlier calendar-date columns remain stored for migration compatibility and no longer restrict requests; they are not converted into day counts.
+
 ## Return receipts and inspection
 
 Students submit return requests; submission cannot confirm a return. An admin approves the request with a return window, issuing a separate random 12-digit receipt number and a `TMCEBMS:RETURN:` QR token. Approval does not restock equipment or close the loan.
 
-Staff open **Return Requests → Equipment return inspection**, search the return number or scan the return QR, match the student's physical ID, and inspect every item and accessory. Confirmation requires complete, undamaged equipment and a valid return window. Only then does the server restock equipment, close the loan, calculate any overdue fee from the actual receipt time, and notify administrators and the student.
+Staff open **Return Requests → Equipment return inspection** and search or scan the return receipt. Scanning opens the inspection form; it does not skip the condition or payment prompts. Staff match the physical student ID, inspect all equipment and accessories, and answer whether the equipment is in good condition. A No answer requires a problem category and description.
 
-Staff reject damaged, incomplete or unpresented returns with an inspection category and reason. The loan remains open and stock stays reserved; the admin and student are notified. This rejection records that staff did not accept the equipment. The student may submit a new request with new codes, while previous receipts remain in transaction details. Damaged equipment is never automatically added to available stock.
+The server calculates overdue days using Philippine calendar dates and the configured daily rate. If a fee is due, staff must answer whether the displayed amount is paid. Staff can accept only complete equipment in good condition, with the student ID verified and any fee paid, during the return window. Damaged, incomplete, unpresented or unpaid returns are rejected with a reason. If the fee changes since lookup, staff must refresh the form and check payment against the new amount.
 
-Return receipts reuse PNG/PDF export and include the original borrowing code, return window, staff inspection result, verified ID, confirmation time and overdue fee when applicable. QR codes alone do not prove a physical handover; staff remain responsible for inspecting identity and equipment.
+Both staff decisions produce **Awaiting Verification** and notify administrators and the student. The table displays the condition/problem, fee, Paid/Not paid status, staff decision and reason. No stock is restored and the loan stays open at this stage. The admin uses **Verify staff decision** in the Action column to review the findings. Verifying an accepted, paid return completes the loan and restores stock once. Verifying a rejection keeps the loan open; the student can then submit a new request with new codes.
+
+Fees and the actual return time are fixed at staff acceptance, so a later admin review does not increase the bill. Existing finalized records are preserved, and missing historical payment records are shown as Not recorded rather than assumed paid. Zero fees show Not required. Return receipts and PNG/PDF exports include condition problems, payment status, staff decision and final admin verification details. Staff remain responsible for physical inspection and checking payment.
 
 Mobile receipts include borrower details, equipment and quantities, purpose, admin instructions, pickup window, return deadline, approval details, and current pickup status. **Save image** and **Export PDF** open the device save/share menu. Saved copies reflect the status when exported; the server remains authoritative.
 

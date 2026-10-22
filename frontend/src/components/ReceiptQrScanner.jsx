@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function ReceiptQrScanner({ onScan }) {
+export default function ReceiptQrScanner({ onScan, message = 'Scan only after checking the physical student ID and inspecting all listed equipment. A valid scan confirms the handover using those checks.' }) {
   const videoRef = useRef(null);
   const onScanRef = useRef(onScan);
   const [error, setError] = useState('');
@@ -44,7 +44,7 @@ export default function ReceiptQrScanner({ onScan }) {
   }, []);
 
   return <div className="modal-body">
-    <p>Scan only after checking the physical student ID and inspecting all listed equipment. A valid scan confirms the handover using those checks.</p>
+    <p>{message}</p>
     {error ? <div className="alert error" role="alert">{error}</div> :
       <video ref={videoRef} className="receipt-camera" autoPlay muted playsInline aria-label="Receipt QR scanner camera" />}
   </div>;

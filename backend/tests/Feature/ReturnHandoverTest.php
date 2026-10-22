@@ -92,9 +92,10 @@ class ReturnHandoverTest extends TestCase
     {
         return [
             'code' => $qr ? $return->receipt['qr_payload'] : $return->transaction_code,
-            'status' => 'Confirmed', 'method' => $qr ? 'qr' : 'manual',
+            'status' => 'Accepted', 'method' => $qr ? 'qr' : 'manual',
             'student_id_number' => '24-123456', 'equipment_checked' => true,
             'condition_on_return' => 'Good',
+            'overdue_fee_paid' => false, 'quoted_overdue_fee' => 0,
         ];
     }
 
@@ -119,7 +120,7 @@ class ReturnHandoverTest extends TestCase
         $this->assertDatabaseHas('notifications', ['user_id' => $this->student->id, 'title' => 'Return Request Approved']);
     }
 
-    public function test_verified_staff_can_confirm_by_number_only_once_and_notify_admin(): void
+    public function test_staff_inspection_waits_for_admin_verification_before_restocking(): void
     {
         $return = $this->approve($this->submit());
         $this->travel(2)->hours();
@@ -127,17 +128,24 @@ class ReturnHandoverTest extends TestCase
         $this->getJson('/api/admin/returns/receipt?code='.$return->transaction_code)
             ->assertOk()->assertJsonPath('data.kind', 'return');
         $this->postJson('/api/admin/returns/handover', $this->confirmation($return))
-            ->assertOk()->assertJsonPath('data.status', 'Confirmed')
+            ->assertOk()->assertJsonPath('data.status', 'Awaiting Verification')
             ->assertJsonPath('data.verified_student_id', '24-123456')
             ->assertJsonPath('data.handover_staff_name', 'Staff Tester');
         $this->postJson('/api/admin/returns/handover', $this->confirmation($return))->assertConflict();
+        $this->assertSame(3, $this->equipment->fresh()->available_quantity);
+        $this->assertSame('Approved', $this->borrowing->fresh()->status);
+        $this->assertNull($return->fresh()->returned_at);
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->admin->id, 'title' => 'Return Inspection Awaiting Verification']);
+        Sanctum::actingAs($this->admin);
+        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Confirmed'])->assertOk();
+        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Confirmed'])->assertConflict();
         $this->assertSame(5, $this->equipment->fresh()->available_quantity);
         $this->assertSame('Completed', $this->borrowing->fresh()->status);
         $this->assertSame($this->admin->id, $return->fresh()->processed_by);
         $this->assertSame($this->staff->id, $return->fresh()->handover_processed_by);
         $this->assertNotNull($return->fresh()->returned_at);
-        $this->assertDatabaseHas('notifications', ['user_id' => $this->admin->id, 'title' => 'Equipment Return Confirmed']);
-        $this->assertDatabaseHas('notifications', ['user_id' => $this->student->id, 'title' => 'Equipment Return Confirmed']);
+        $this->assertSame($this->admin->id, $return->fresh()->admin_verified_by);
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->student->id, 'title' => 'Equipment Return Verified']);
     }
 
     public function test_return_qr_requires_the_right_window_and_cannot_be_replayed(): void
@@ -149,7 +157,7 @@ class ReturnHandoverTest extends TestCase
         $this->travel(2)->hours();
         $this->postJson('/api/admin/returns/handover', $payload)->assertOk();
         $this->postJson('/api/admin/returns/handover', $payload)->assertConflict();
-        $this->assertSame(5, $this->equipment->fresh()->available_quantity);
+        $this->assertSame(3, $this->equipment->fresh()->available_quantity);
     }
 
     public function test_expired_receipts_and_wrong_qr_types_cannot_confirm_returns(): void
@@ -184,10 +192,16 @@ class ReturnHandoverTest extends TestCase
         $this->postJson('/api/admin/returns/handover', [
             'code' => $return->transaction_code, 'status' => 'Rejected', 'method' => 'manual',
             'condition_on_return' => 'Damaged', 'remarks' => 'Cracked lens; equipment was not accepted.',
+            'condition_notes' => 'Cracked lens', 'quoted_overdue_fee' => 0, 'overdue_fee_paid' => false,
         ])->assertOk()->assertJsonPath('data.handover_status', 'Rejected');
         $this->assertSame(3, $this->equipment->fresh()->available_quantity);
         $this->assertSame('Approved', $this->borrowing->fresh()->status);
-        $this->assertDatabaseHas('notifications', ['user_id' => $this->admin->id, 'title' => 'Equipment Return Rejected']);
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->admin->id, 'title' => 'Return Inspection Awaiting Verification']);
+        Sanctum::actingAs($this->student);
+        $this->postJson("/api/mobile/borrowings/{$this->borrowing->id}/return")->assertUnprocessable();
+        Sanctum::actingAs($this->admin);
+        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Confirmed'])->assertUnprocessable();
+        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Rejected', 'remarks' => 'Verified cracked lens and staff rejection.'])->assertOk();
         $replacement = $this->approve($this->submit());
         $this->assertNotSame($return->transaction_code, $replacement->transaction_code);
         $this->assertNotSame($return->qr_token, $replacement->qr_token);
@@ -202,7 +216,7 @@ class ReturnHandoverTest extends TestCase
         Sanctum::actingAs($this->staff);
         $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Approved'])->assertForbidden();
         Sanctum::actingAs($this->admin);
-        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Confirmed'])->assertUnprocessable();
+        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Confirmed'])->assertConflict();
         $return = $this->approve($return);
         Sanctum::actingAs($this->student);
         $this->postJson('/api/admin/returns/handover', $this->confirmation($return))->assertForbidden();
@@ -223,7 +237,66 @@ class ReturnHandoverTest extends TestCase
         $return = $this->approve($this->submit(), 144);
         $this->travel(5)->days();
         Sanctum::actingAs($this->staff);
-        $this->postJson('/api/admin/returns/handover', $this->confirmation($return))
+        $this->postJson('/api/admin/returns/handover', array_replace($this->confirmation($return), ['quoted_overdue_fee' => 22.5, 'overdue_fee_paid' => true]))
             ->assertOk()->assertJsonPath('data.overdue_days', 3)->assertJsonPath('data.overdue_fee', 22.5);
+        $this->travel(2)->days();
+        Sanctum::actingAs($this->admin);
+        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Confirmed'])
+            ->assertOk()->assertJsonPath('data.overdue_fee', 22.5);
+        $this->assertSame('2026-10-27', $return->fresh()->returned_at->toDateString());
+    }
+
+    public function test_unpaid_fee_can_be_recorded_as_rejected_and_verified_by_admin(): void
+    {
+        Setting::set(Setting::OVERDUE_FEE_PER_DAY, 10);
+        $return = $this->approve($this->submit(), 144);
+        $this->travel(3)->days();
+        Sanctum::actingAs($this->staff);
+        $this->getJson('/api/admin/returns/receipt?code='.$return->transaction_code)
+            ->assertOk()->assertJsonPath('data.fee_quote.overdue_fee', 10)->assertJsonPath('data.fee_quote.overdue_days', 1);
+        $payload = array_replace($this->confirmation($return), ['quoted_overdue_fee' => 10]);
+        $this->postJson('/api/admin/returns/handover', $payload)->assertUnprocessable();
+        $this->postJson('/api/admin/returns/handover', array_replace($payload, ['status' => 'Rejected', 'remarks' => 'Overdue fee not paid']))
+            ->assertOk()->assertJsonPath('data.payment_status', 'Not paid')->assertJsonPath('data.condition_on_return', 'Good');
+        $this->assertSame(3, $this->equipment->fresh()->available_quantity);
+        Sanctum::actingAs($this->admin);
+        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Confirmed'])->assertUnprocessable();
+        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Rejected', 'remarks' => 'Verified unpaid fee.'])->assertOk();
+        $this->assertSame('Approved', $this->borrowing->fresh()->status);
+        $this->assertSame(3, $this->equipment->fresh()->available_quantity);
+    }
+
+    public function test_staff_must_supply_condition_notes_and_payment_answer(): void
+    {
+        $return = $this->approve($this->submit());
+        $this->travel(2)->hours();
+        Sanctum::actingAs($this->staff);
+        $payload = array_replace($this->confirmation($return), ['status' => 'Rejected', 'condition_on_return' => 'Damaged', 'remarks' => 'Broken equipment']);
+        $this->postJson('/api/admin/returns/handover', $payload)->assertUnprocessable();
+        $payload['condition_notes'] = 'The projector lens is cracked.';
+        unset($payload['overdue_fee_paid']);
+        $this->postJson('/api/admin/returns/handover', $payload)->assertUnprocessable();
+        $this->assertSame('Approved', $return->fresh()->status);
+    }
+
+    public function test_changed_fee_quote_requires_staff_to_check_payment_again(): void
+    {
+        Setting::set(Setting::OVERDUE_FEE_PER_DAY, 10);
+        $return = $this->approve($this->submit(), 144);
+        $this->travel(3)->days();
+        Sanctum::actingAs($this->staff);
+        $this->postJson('/api/admin/returns/handover', array_replace($this->confirmation($return), ['overdue_fee_paid' => true]))->assertConflict();
+        $this->assertSame('Approved', $return->fresh()->status);
+        $this->assertSame(3, $this->equipment->fresh()->available_quantity);
+    }
+
+    public function test_staff_cannot_perform_final_admin_verification(): void
+    {
+        $return = $this->approve($this->submit());
+        $this->travel(2)->hours();
+        Sanctum::actingAs($this->staff);
+        $this->postJson('/api/admin/returns/handover', $this->confirmation($return))->assertOk();
+        $this->putJson("/api/admin/returns/{$return->id}/process", ['status' => 'Confirmed'])->assertForbidden();
+        $this->assertSame('Awaiting Verification', $return->fresh()->status);
     }
 }

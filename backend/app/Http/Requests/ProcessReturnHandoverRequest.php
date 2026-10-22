@@ -16,13 +16,15 @@ class ProcessReturnHandoverRequest extends FormRequest
     {
         return [
             'code' => ['required', 'string', 'max:80', 'regex:/^(\d{12}|TMCEBMS:RETURN:[a-f0-9]{64})$/'],
-            'status' => ['required', Rule::in(['Confirmed', 'Rejected'])],
+            'status' => ['required', Rule::in(['Accepted', 'Rejected'])],
             'method' => ['required', Rule::in(['manual', 'qr'])],
             'remarks' => ['required_if:status,Rejected', 'nullable', 'string', 'max:500'],
-            'student_id_number' => ['required_if:status,Confirmed', 'nullable', 'string', 'max:20'],
-            'equipment_checked' => ['required_if:status,Confirmed', 'accepted_if:status,Confirmed'],
-            'condition_on_return' => ['required', Rule::in($this->input('status') === 'Confirmed'
-                ? ['Good'] : ['Damaged', 'Incomplete', 'NotPresented', 'Other'])],
+            'student_id_number' => ['required_if:status,Accepted', 'nullable', 'string', 'max:20'],
+            'equipment_checked' => ['required_if:status,Accepted', 'accepted_if:status,Accepted'],
+            'condition_on_return' => ['required', Rule::in(['Good', 'Damaged', 'Incomplete', 'NotPresented', 'Other'])],
+            'condition_notes' => ['required_unless:condition_on_return,Good', 'nullable', 'string', 'max:1000'],
+            'overdue_fee_paid' => ['required', 'boolean'],
+            'quoted_overdue_fee' => ['required', 'numeric', 'min:0'],
         ];
     }
 }

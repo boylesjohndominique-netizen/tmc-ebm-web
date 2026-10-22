@@ -26,7 +26,7 @@ class ReturnHandoverController extends Controller
         $return = $service->process($request->validated(), $request->user());
 
         return response()->json([
-            'message' => $return->status === 'Confirmed' ? 'Return inspected and confirmed. Equipment restocked and admin notified.' : 'Return rejected and admin notified. The loan remains open.',
+            'message' => 'Staff decision recorded. Awaiting final administrator verification; stock and loan status are unchanged.',
             'data' => new ReturnReceiptResource($return),
         ]);
     }

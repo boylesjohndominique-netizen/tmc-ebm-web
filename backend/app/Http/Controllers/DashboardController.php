@@ -26,7 +26,7 @@ class DashboardController extends Controller
                         ->where('pickup_status', 'Received')
                         ->whereDate('expected_return_date', '<', now()->toDateString())->count(),
                     'total_users' => User::count(),
-                    'pending_returns' => ReturnRequest::whereIn('status', ['Pending', 'Approved'])->count(),
+                    'pending_returns' => ReturnRequest::whereIn('status', ['Pending', 'Approved', 'Awaiting Verification'])->count(),
                 ],
                 'recent_requests' => BorrowingRequest::with(['user', 'items.equipment'])
                     ->latest()->limit(8)->get(),
