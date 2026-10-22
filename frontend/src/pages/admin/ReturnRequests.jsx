@@ -10,6 +10,7 @@ import EmptyState from '../../components/EmptyState';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
 import useRealtimeResource from '../../hooks/useRealtimeResource';
 import { fmtCurrency } from '../../utils/datetime';
+import BorrowingPickupDesk from '../../components/BorrowingPickupDesk';
 
 export default function ReturnRequests() {
   const { can } = useAuth();
@@ -25,6 +26,8 @@ export default function ReturnRequests() {
   const [action, setAction] = useState(null);
   const [remarks, setRemarks] = useState('');
   const [modalError, setModalError] = useState('');
+  const [handoverStart, setHandoverStart] = useState('');
+  const [handoverEnd, setHandoverEnd] = useState('');
 
   const load = useCallback(() => {
     return api.get('/admin/returns')
@@ -43,7 +46,7 @@ export default function ReturnRequests() {
   const query = useDebouncedValue(search.trim(), 300).toLowerCase();
   const filtered = items.filter(x => {
     const fullName = [x.user?.first_name, x.user?.middle_name, x.user?.last_name].filter(Boolean).join(' ').toLowerCase();
-    const textMatch = !query || fullName.includes(query) || `#${x.id}`.includes(query) || `#${x.borrowing_request_id}`.includes(query);
+    const textMatch = !query || fullName.includes(query) || `#${x.id}`.includes(query) || `#${x.borrowing_request_id}`.includes(query) || x.transaction_code?.includes(query);
     const statusMatch = statusFilter === 'All' || x.status === statusFilter;
     return textMatch && statusMatch;
   });
@@ -51,14 +54,17 @@ export default function ReturnRequests() {
   const clearFilters = () => { setSearch(''); setStatusFilter('All'); };
   const statuses = [...new Set(items.map(x => x.status))]; // statuses actually present
 
-  const open = (x, mode) => { setSelected(x); setAction(mode); setRemarks(''); setModalError(''); };
+  const open = (x, mode) => { setSelected(x); setAction(mode); setRemarks(''); setModalError(''); setHandoverStart(''); setHandoverEnd(''); };
   const close = () => { if (!busy) { setSelected(null); setAction(null); setRemarks(''); setModalError(''); } };
 
   const submit = async () => {
     setBusy(true);
     setModalError('');
     try {
-      await api.put(`/admin/returns/${selected.id}/process`, { status: action, remarks: remarks || undefined });
+      await api.put(`/admin/returns/${selected.id}/process`, {
+        status: action, remarks: remarks || undefined,
+        ...(action === 'Approved' ? { handover_starts_at: new Date(handoverStart).toISOString(), handover_ends_at: new Date(handoverEnd).toISOString() } : {}),
+      });
       close();
       setSelected(null);
       await load();
@@ -76,6 +82,7 @@ export default function ReturnRequests() {
   return (
     <div className="panel">
       <h1>Return Requests</h1>
+      {can('returns', 'handover') && <BorrowingPickupDesk onProcessed={load} isReturn />}
       {error && <div className="alert error">{error}</div>}
       {loading && !error && <Skeleton rows={4} />}
       {!loading && !error && (items.length
@@ -94,15 +101,15 @@ export default function ReturnRequests() {
           <tbody>
             {filtered.map(x => (
               <tr key={x.id}>
-                <td>#{x.id}</td>
+                <td>#{x.id}<br/><small>{x.transaction_code}</small></td>
                 <td>{x.user?.first_name} {x.user?.last_name}</td>
                 <td>#{x.borrowing_request_id}</td>
                 <td>{x.condition_on_return || '—'}</td>
                 <td>{x.overdue_fee > 0 ? `${fmtCurrency(x.overdue_fee)} · ${x.overdue_days}d` : '—'}</td>
-                <td><StatusBadge status={x.status} /></td>
+                <td><StatusBadge status={x.status} />{x.handover_status && <div className="muted">Staff: {x.handover_status}</div>}</td>
                 <td>
                   {x.status === 'Pending' && can('returns', 'process') && <>
-                    <button className="btn btn-primary small" disabled={busy} onClick={() => open(x, 'Confirmed')}>Confirm</button>{' '}
+                    <button className="btn btn-primary small" disabled={busy} onClick={() => open(x, 'Approved')}>Approve receipt</button>{' '}
                     <button className="btn btn-danger small" disabled={busy} onClick={() => open(x, 'Rejected')}>Reject</button>
                   </>}
                   {x.status === 'Pending' && !can('returns', 'process') && <span className="muted">Awaiting review</span>}
@@ -121,11 +128,12 @@ export default function ReturnRequests() {
         onClose={close}
         tone={isReject ? 'danger' : 'primary'}
         icon={isReject ? XCircle : CheckCircle2}
-        title={`Return #${selected?.id} — ${isReject ? 'Reject' : 'Confirm'}`}
-        submitLabel={isReject ? 'Reject Return' : 'Confirm Return'}
+        title={`Return #${selected?.id} — ${isReject ? 'Reject' : 'Approve receipt'}`}
+        submitLabel={isReject ? 'Reject Return' : 'Approve Return Receipt'}
         busyLabel={isReject ? 'Rejecting…' : 'Confirming…'}
         onSubmit={submit}
         busy={busy}
+        disableSubmit={isReject ? !remarks.trim() : (!handoverStart || !handoverEnd || new Date(handoverEnd) <= new Date(handoverStart))}
       >
         {selected && (
           <div className="modal-body">
@@ -136,7 +144,7 @@ export default function ReturnRequests() {
 
             {borrowing?.items?.length > 0 && (
               <>
-                <p><b>Items to restock on confirm:</b></p>
+                <p><b>Equipment staff must inspect:</b></p>
                 <ul className="equipment-list">
                   {borrowing.items.map(i => (
                     <li key={i.id}>
@@ -156,9 +164,13 @@ export default function ReturnRequests() {
               <p><b>Returned at:</b> {new Date(selected.returned_at).toLocaleString()}</p>
             )}
 
-            {isReject && (
+            {!isReject && <>
+              <label>Return window starts <input type="datetime-local" value={handoverStart} onChange={event => setHandoverStart(event.target.value)} required /></label>
+              <label>Return window ends <input type="datetime-local" value={handoverEnd} min={handoverStart} onChange={event => setHandoverEnd(event.target.value)} required /></label>
+            </>}
+            {(
               <label>
-                Reason <span className="muted">(shown to the borrower)</span>
+                {isReject ? 'Reason (required)' : 'Return instructions (optional)'} <span className="muted">(shown to the borrower)</span>
                 <textarea
                   value={remarks}
                   onChange={e => setRemarks(e.target.value)}
@@ -170,7 +182,7 @@ export default function ReturnRequests() {
 
             {!isReject && (
               <div className="alert success" style={{ marginTop: 10 }}>
-                Confirming restocks {itemCount || 'the'} item{itemCount === 1 ? '' : 's'} and marks the borrowing as completed.
+                Approval issues a receipt for {itemCount || 'the'} item{itemCount === 1 ? '' : 's'}. Staff must verify the student and inspect the equipment before restocking or closing the loan.
               </div>
             )}
 

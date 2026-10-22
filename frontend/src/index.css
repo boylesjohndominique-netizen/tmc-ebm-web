@@ -3712,3 +3712,21 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   height: 100%;
   object-fit: cover;
 }
+
+.pickup-desk {
+  margin-block: 20px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.pickup-desk h2 { margin-top: 0; }
+.pickup-desk label { display: grid; gap: 6px; }
+.pickup-desk .toolbar { align-items: end; flex-wrap: wrap; }
+.pickup-desk input { max-width: 100%; }
+.pickup-desk textarea { width: 100%; }
+.pickup-receipt { overflow-wrap: anywhere; }
+.receipt-camera { width: 100%; max-height: 380px; border-radius: 10px; }
+.pickup-desk .handover-check { display: flex; align-items: start; gap: 10px; margin-block: 14px; }
+.pickup-desk .handover-check input { width: 18px; height: 18px; flex-shrink: 0; }

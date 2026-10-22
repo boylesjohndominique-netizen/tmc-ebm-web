@@ -268,11 +268,11 @@ export default function Reports() {
                     <tr key={x.id}>
                       <td>#{x.id}</td>
                       <td>{fullName(x.user)}</td>
-                      <td>#{x.borrowing_request_id}</td>
+                      <td>#{x.borrowing_request_id}<br/><small>{x.transaction_code}</small></td>
                       <td>{x.condition_on_return || '—'}</td>
-                      <td><StatusBadge status={x.status} /></td>
-                      <td>{x.processor ? fullName(x.processor) : '—'}</td>
-                      <td>{fmtDateTime(x.updated_at)}</td>
+                      <td><StatusBadge status={x.status} />{x.handover_remarks && <div>{x.handover_remarks}</div>}</td>
+                      <td>{(x.handover_processor || x.processor) ? fullName(x.handover_processor || x.processor) : '—'}</td>
+                      <td>{fmtDateTime(x.handover_processed_at || x.updated_at)}</td>
                     </tr>
                   ))}</tbody>
                 </table></div>
