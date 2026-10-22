@@ -9,6 +9,7 @@ use App\Models\ReturnRequest;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -128,7 +129,7 @@ class MobileController extends Controller
     public function myBorrowings(Request $request)
     {
         $borrowings = BorrowingRequest::where('user_id', $request->user()->id)
-            ->with(['items.equipment.category', 'returns'])
+            ->with(['items.equipment.category', 'returns' => fn ($query) => $query->orderByDesc('id'), 'processor'])
             ->latest()
             ->get();
 
@@ -144,11 +145,13 @@ class MobileController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        if ($borrowing->status !== 'Pending') {
-            return response()->json(['message' => 'Only pending requests can be cancelled.'], 422);
-        }
+        $borrowing = DB::transaction(function () use ($borrowing) {
+            $locked = BorrowingRequest::lockForUpdate()->findOrFail($borrowing->id);
+            abort_unless($locked->status === 'Pending', 422, 'Only pending requests can be cancelled.');
+            $locked->update(['status' => 'Cancelled']);
 
-        $borrowing->update(['status' => 'Cancelled']);
+            return $locked;
+        });
 
         return response()->json([
             'message' => 'Borrowing request cancelled.',
@@ -169,28 +172,24 @@ class MobileController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        if ($borrowing->status !== 'Approved') {
-            return response()->json(['message' => 'Only approved borrowings can be returned.'], 422);
-        }
-
-        $existing = ReturnRequest::where('borrowing_request_id', $borrowing->id)
-            ->where('status', 'Pending')
-            ->exists();
-
-        if ($existing) {
-            return response()->json(['message' => 'A return request is already pending for this borrowing.'], 422);
-        }
-
         $data = $request->validate([
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $returnReq = ReturnRequest::create([
-            'borrowing_request_id' => $borrowing->id,
-            'user_id' => $request->user()->id,
-            'remarks' => $data['remarks'] ?? null,
-            'status' => 'Pending',
-        ]);
+        $returnReq = DB::transaction(function () use ($borrowing, $request, $data) {
+            $borrowing = BorrowingRequest::lockForUpdate()->findOrFail($borrowing->id);
+            abort_unless($borrowing->status === 'Approved' && $borrowing->pickup_status === 'Received', 422,
+                'Equipment must be received from staff before requesting a return.');
+            abort_if($borrowing->returns()->whereIn('status', ['Pending', 'Approved'])->exists(), 422,
+                'A return request is already awaiting admin review or staff inspection.');
+
+            return ReturnRequest::create([
+                'borrowing_request_id' => $borrowing->id,
+                'user_id' => $request->user()->id,
+                'remarks' => $data['remarks'] ?? null,
+                'status' => 'Pending',
+            ]);
+        });
 
         // Distinct return-request notification (type: Return) so the admin
         // inbox can distinguish it from borrow/verification events.

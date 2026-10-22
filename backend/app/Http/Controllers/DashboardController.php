@@ -21,13 +21,14 @@ class DashboardController extends Controller
                 'statistics' => [
                     'total_equipment' => Equipment::count(),
                     'available_equipment' => Equipment::sum('available_quantity'),
-                    'pending_requests' => BorrowingRequest::where('status','Pending')->count(),
-                    'overdue' => BorrowingRequest::where('status','Approved')
-                        ->whereDate('expected_return_date','<',now()->toDateString())->count(),
-                    'total_users' => \App\Models\User::count(),
-                    'pending_returns' => ReturnRequest::where('status','Pending')->count(),
+                    'pending_requests' => BorrowingRequest::where('status', 'Pending')->count(),
+                    'overdue' => BorrowingRequest::where('status', 'Approved')
+                        ->where('pickup_status', 'Received')
+                        ->whereDate('expected_return_date', '<', now()->toDateString())->count(),
+                    'total_users' => User::count(),
+                    'pending_returns' => ReturnRequest::whereIn('status', ['Pending', 'Approved'])->count(),
                 ],
-                'recent_requests' => BorrowingRequest::with(['user','items.equipment'])
+                'recent_requests' => BorrowingRequest::with(['user', 'items.equipment'])
                     ->latest()->limit(8)->get(),
             ]);
         }
@@ -35,13 +36,14 @@ class DashboardController extends Controller
         return response()->json([
             'role' => $user->role?->name,
             'statistics' => [
-                'active_borrowings' => BorrowingRequest::where('user_id',$user->id)->where('status','Approved')->count(),
-                'pending_requests' => BorrowingRequest::where('user_id',$user->id)->where('status','Pending')->count(),
-                'overdue' => BorrowingRequest::where('user_id',$user->id)->where('status','Approved')
-                    ->whereDate('expected_return_date','<',now()->toDateString())->count(),
-                'completed' => BorrowingRequest::where('user_id',$user->id)->where('status','Completed')->count(),
+                'active_borrowings' => BorrowingRequest::where('user_id', $user->id)->where('status', 'Approved')->where('pickup_status', 'Received')->count(),
+                'pending_requests' => BorrowingRequest::where('user_id', $user->id)->where('status', 'Pending')->count(),
+                'overdue' => BorrowingRequest::where('user_id', $user->id)->where('status', 'Approved')
+                    ->where('pickup_status', 'Received')
+                    ->whereDate('expected_return_date', '<', now()->toDateString())->count(),
+                'completed' => BorrowingRequest::where('user_id', $user->id)->where('status', 'Completed')->count(),
             ],
-            'recent_requests' => BorrowingRequest::with('items.equipment')->where('user_id',$user->id)
+            'recent_requests' => BorrowingRequest::with('items.equipment')->where('user_id', $user->id)
                 ->latest()->limit(8)->get(),
         ]);
     }
@@ -58,12 +60,12 @@ class DashboardController extends Controller
         // formats it with the shared date style ("Apr 2026").
         $monthly = collect(range(5, 0))->map(function ($i) {
             $start = now()->subMonths($i)->startOfMonth();
-            $end   = now()->subMonths($i)->endOfMonth();
+            $end = now()->subMonths($i)->endOfMonth();
 
             return [
-                'month'    => $start->toDateString(),
+                'month' => $start->toDateString(),
                 'requests' => BorrowingRequest::whereBetween('created_at', [$start, $end])->count(),
-                'returns'  => ReturnRequest::whereBetween('created_at', [$start, $end])->count(),
+                'returns' => ReturnRequest::whereBetween('created_at', [$start, $end])->count(),
             ];
         })->values();
 
@@ -84,12 +86,12 @@ class DashboardController extends Controller
             ->with('equipment:id,name')
             ->get()
             ->map(fn ($item) => [
-                'name'  => $item->equipment?->name ?? 'Unknown',
+                'name' => $item->equipment?->name ?? 'Unknown',
                 'value' => (int) $item->total,
             ]);
 
         // ---- Stock availability snapshot ----
-        $totalUnits     = (int) Equipment::sum('quantity');
+        $totalUnits = (int) Equipment::sum('quantity');
         $availableUnits = (int) Equipment::sum('available_quantity');
         $stock = [
             ['name' => 'Available', 'value' => $availableUnits],
@@ -108,18 +110,18 @@ class DashboardController extends Controller
 
         // ---- Headline metrics ----
         $totalRequests = BorrowingRequest::count();
-        $approved  = BorrowingRequest::where('status', 'Approved')->count();
+        $approved = BorrowingRequest::where('status', 'Approved')->count();
         $completed = BorrowingRequest::where('status', 'Completed')->count();
 
         return response()->json([
             'monthly_activity' => $monthly,
-            'status_mix'       => $statusMix,
-            'top_equipment'    => $topEquipment,
-            'stock'            => $stock,
-            'users_by_role'    => $usersByRole,
+            'status_mix' => $statusMix,
+            'top_equipment' => $topEquipment,
+            'stock' => $stock,
+            'users_by_role' => $usersByRole,
             'metrics' => [
-                'total_requests'  => $totalRequests,
-                'approval_rate'   => $totalRequests ? round($approved / $totalRequests * 100) : 0,
+                'total_requests' => $totalRequests,
+                'approval_rate' => $totalRequests ? round($approved / $totalRequests * 100) : 0,
                 'completion_rate' => $totalRequests ? round($completed / $totalRequests * 100) : 0,
                 'pending_returns' => ReturnRequest::where('status', 'Pending')->count(),
             ],

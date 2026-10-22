@@ -25,12 +25,14 @@
 <body>
     <div class="wrap">
         <div class="header {{ strtolower($status) }}">
-            <h1>{{ $status === 'Confirmed' ? '✅' : '❌' }} Return {{ $status }}</h1>
+            <h1>Return {{ $status }}</h1>
             <p>TMC Equipment Borrowing System</p>
         </div>
         <div class="body">
             <p class="greeting">Hi {{ $userName }},</p>
-            @if($status === 'Confirmed')
+            @if($status === 'Approved')
+                <p class="text">Your return request for borrowing #{{ $borrowingRequestId }} was approved. Open your return receipt in the mobile app and present it with your student ID during the return window. Staff must inspect and receive the equipment before the return is completed.</p>
+            @elseif($status === 'Confirmed')
                 <p class="text">Your equipment return for borrowing request #{{ $borrowingRequestId }} has been confirmed. Thank you for returning on time!</p>
             @else
                 <p class="text">Your return request for borrowing #{{ $borrowingRequestId }} was rejected. Please check the remarks below and try again.</p>

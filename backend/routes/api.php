@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\Admin\BorrowingManagementController;
+use App\Http\Controllers\Admin\BorrowingPickupController;
 use App\Http\Controllers\Admin\EquipmentManagementController;
 use App\Http\Controllers\Admin\NotificationManagementController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\ReturnHandoverController;
 use App\Http\Controllers\Admin\ReturnManagementController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserManagementController;
@@ -288,6 +290,11 @@ Route::middleware('auth:sanctum')->group(function () {
             ])->middleware('perm:equipment.delete');
 
             // Borrowing Requests
+            Route::get('/borrowings/receipt', [BorrowingPickupController::class, 'show'])
+                ->middleware(['perm:borrowings.view', 'perm:borrowings.handover', 'throttle:30,1']);
+            Route::post('/borrowings/pickup', [BorrowingPickupController::class, 'process'])
+                ->middleware(['perm:borrowings.view', 'perm:borrowings.handover', 'throttle:30,1']);
+
             Route::get('/borrowings', [
                 BorrowingManagementController::class,
                 'index',
@@ -299,6 +306,11 @@ Route::middleware('auth:sanctum')->group(function () {
             ])->middleware('perm:borrowings.process');
 
             // Return Requests
+            Route::get('/returns/receipt', [ReturnHandoverController::class, 'show'])
+                ->middleware(['perm:returns.view', 'perm:returns.handover', 'throttle:30,1']);
+            Route::post('/returns/handover', [ReturnHandoverController::class, 'process'])
+                ->middleware(['perm:returns.view', 'perm:returns.handover', 'throttle:30,1']);
+
             Route::get('/returns', [
                 ReturnManagementController::class,
                 'index',

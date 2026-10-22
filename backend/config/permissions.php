@@ -33,14 +33,14 @@ return [
 
         'borrowings' => [
             'label' => 'Borrowing Requests',
-            'description' => 'Review, approve or reject borrowing requests.',
-            'actions' => ['view', 'process'],
+            'description' => 'Review borrowing requests and confirm or reject equipment pickup.',
+            'actions' => ['view', 'process', 'handover'],
         ],
 
         'returns' => [
             'label' => 'Return Requests',
-            'description' => 'Confirm or reject equipment returns.',
-            'actions' => ['view', 'process'],
+            'description' => 'Approve return receipts and inspect equipment before confirming returns.',
+            'actions' => ['view', 'process', 'handover'],
         ],
 
         'transactions' => [
@@ -79,8 +79,8 @@ return [
         'Staff' => [
             'dashboard' => ['view'],
             'equipment' => ['view'],
-            'borrowings' => ['view'],
-            'returns' => ['view'],
+            'borrowings' => ['view', 'handover'],
+            'returns' => ['view', 'handover'],
             'transactions' => ['view'],
         ],
         'Faculty' => [

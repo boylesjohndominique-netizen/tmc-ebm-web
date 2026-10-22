@@ -21,7 +21,7 @@ class ReturnStatusMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $statusText = $this->status === 'Confirmed' ? 'Confirmed' : 'Rejected';
+        $statusText = $this->status;
 
         return new Envelope(
             subject: "Return Request {$statusText} — TMCEBMS",

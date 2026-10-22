@@ -92,6 +92,7 @@ class ReportController extends Controller
                 'borrowings' => $borrowings->count(),
                 'returns' => $returns->count(),
                 'overdue' => BorrowingRequest::where('status', 'Approved')
+                    ->where('pickup_status', 'Received')
                     ->whereDate('expected_return_date', '<', now()->toDateString())->count(),
             ],
             'users' => $users,
@@ -110,7 +111,7 @@ class ReportController extends Controller
             ->latest('updated_at')
             ->get();
 
-        $returns = ReturnRequest::with(['user', 'borrowing.items.equipment', 'processor'])
+        $returns = ReturnRequest::with(['user', 'borrowing.items.equipment', 'processor', 'handoverProcessor'])
             ->whereIn('status', ['Confirmed', 'Rejected'])
             ->when($from, fn ($q) => $q->whereDate('updated_at', '>=', $from))
             ->when($to, fn ($q) => $q->whereDate('updated_at', '<=', $to))
@@ -217,7 +218,7 @@ class ReportController extends Controller
 
     private function auditReturnRows($returns): array
     {
-        $rows = [['ID', 'User', 'Borrowing', 'Condition', 'Outcome', 'Processed By', 'Date Processed']];
+        $rows = [['ID', 'User', 'Borrowing', 'Condition', 'Outcome', 'Processed By', 'Date Processed', 'Receipt Number', 'Staff Remarks']];
 
         foreach ($returns as $x) {
             $rows[] = [
@@ -226,8 +227,10 @@ class ReportController extends Controller
                 '#'.$x->borrowing_request_id,
                 $x->condition_on_return ?: '—',
                 $x->status,
-                $x->processor ? $this->fullName($x->processor) : '—',
-                $this->dateTime($x->updated_at),
+                ($x->handoverProcessor ?? $x->processor) ? $this->fullName($x->handoverProcessor ?? $x->processor) : '—',
+                $this->dateTime($x->handover_processed_at ?? $x->updated_at),
+                $x->transaction_code,
+                $x->handover_remarks,
             ];
         }
 

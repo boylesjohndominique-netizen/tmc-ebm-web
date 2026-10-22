@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Events\UserBanned;
@@ -38,7 +39,7 @@ class UserManagementController extends Controller
 
     public function show(User $user)
     {
-        $borrowed = BorrowingRequest::where('user_id', $user->id)->where('status', 'Approved')->with('items.equipment')->get();
+        $borrowed = BorrowingRequest::where('user_id', $user->id)->where('status', 'Approved')->where('pickup_status', 'Received')->with('items.equipment')->get();
 
         return response()->json([
             'user' => array_merge($user->load('role')->toArray(), [
@@ -53,6 +54,7 @@ class UserManagementController extends Controller
                 'currently_borrowed_units' => (int) $borrowed->sum(fn ($b) => $b->items->sum('quantity')),
                 'completed' => BorrowingRequest::where('user_id', $user->id)->where('status', 'Completed')->count(),
                 'overdue' => BorrowingRequest::where('user_id', $user->id)->where('status', 'Approved')
+                    ->where('pickup_status', 'Received')
                     ->whereDate('expected_return_date', '<', now()->toDateString())->count(),
                 'returns' => ReturnRequest::where('user_id', $user->id)->count(),
             ],
@@ -114,7 +116,7 @@ class UserManagementController extends Controller
             'email' => $data['email'],
             'contact_number' => $data['contact_number'] ?? null,
             'role_id' => $role->id,
-            ...(!empty($data['password']) ? ['password' => $data['password']] : []),
+            ...(! empty($data['password']) ? ['password' => $data['password']] : []),
         ]);
 
         return response()->json($user->fresh()->load('role'));
@@ -125,7 +127,7 @@ class UserManagementController extends Controller
      */
     public function verify(Request $request, User $user)
     {
-        if (!$user->isPending()) {
+        if (! $user->isPending()) {
             return response()->json(['message' => 'Only pending accounts can be verified.'], 422);
         }
 
@@ -209,7 +211,7 @@ class UserManagementController extends Controller
      */
     public function unban(Request $request, User $user)
     {
-        if (!$user->isBanned()) {
+        if (! $user->isBanned()) {
             return response()->json(['message' => 'This account is not banned.'], 422);
         }
 
@@ -242,13 +244,13 @@ class UserManagementController extends Controller
      */
     public function idPhoto(Request $request, User $user, string $side)
     {
-        if (!in_array($side, ['front', 'back'], true)) {
+        if (! in_array($side, ['front', 'back'], true)) {
             return response()->json(['message' => 'Unknown ID side.'], 404);
         }
 
         $path = $side === 'front' ? $user->id_front_path : $user->id_back_path;
 
-        if (!$path || !\Storage::disk('local')->exists($path)) {
+        if (! $path || ! \Storage::disk('local')->exists($path)) {
             return response()->json(['message' => 'No ID photo submitted.'], 404);
         }
 
@@ -268,7 +270,7 @@ class UserManagementController extends Controller
             || ReturnRequest::where('user_id', $user->id)->exists();
 
         // DB foreign keys cascade on delete; by default protect the audit trail.
-        if ($hasHistory && !$request->boolean('force')) {
+        if ($hasHistory && ! $request->boolean('force')) {
             return response()->json([
                 'message' => 'This user has borrowing/return history. Delete their records too by confirming permanent deletion, or keep the user.',
                 'requires_force' => true,

@@ -32,7 +32,7 @@ class TransactionController extends Controller
             ->latest('updated_at')
             ->get();
 
-        $returns = ReturnRequest::with(['user', 'borrowing.items.equipment', 'processor'])
+        $returns = ReturnRequest::with(['user', 'borrowing.items.equipment', 'processor', 'handoverProcessor'])
             ->whereIn('status', ['Confirmed', 'Rejected'])
             ->when($from, fn ($q) => $q->whereDate('updated_at', '>=', $from))
             ->when($to, fn ($q) => $q->whereDate('updated_at', '<=', $to))
