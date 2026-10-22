@@ -57,7 +57,10 @@ class ReturnHandoverService
                 abort_unless($return->handover_starts_at && $return->handover_ends_at &&
                     now()->betweenIncluded($return->handover_starts_at, $return->handover_ends_at), 409,
                     'Returns can only be accepted during the approved return window.');
-                $verification = app(HandoverVerificationService::class)->verify($return->receipt_snapshot['borrower']['id_number'] ?? null, $data);
+                $verification = app(HandoverVerificationService::class)->verify(
+                    $return->receipt_snapshot['borrower']['id_number'] ?? $borrowing->user?->id_number,
+                    $data
+                );
                 abort_unless($data['condition_on_return'] === 'Good', 422, 'Reject damaged or incomplete equipment and record the problem.');
                 abort_if($fee['overdue_fee'] > 0 && ! $attributes['overdue_fee_paid'], 422,
                     'The overdue fee is not paid. Record a rejected return with the payment reason.');

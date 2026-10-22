@@ -12,7 +12,6 @@ export default function ReturnInspectionDesk({ onProcessed }) {
   const [condition, setCondition] = useState('');
   const [conditionNotes, setConditionNotes] = useState('');
   const [paid, setPaid] = useState('');
-  const [studentId, setStudentId] = useState('');
   const [checked, setChecked] = useState(false);
   const [reason, setReason] = useState('');
   const [method, setMethod] = useState('manual');
@@ -35,7 +34,7 @@ export default function ReturnInspectionDesk({ onProcessed }) {
     }
     processing.current = true;
     setBusy(true); setError(''); setNotice(''); setReceipt(null);
-    setCondition(''); setConditionNotes(''); setPaid(''); setStudentId(''); setChecked(false); setReason('');
+    setCondition(''); setConditionNotes(''); setPaid(''); setChecked(false); setReason('');
     try {
       const { data } = await api.get('/admin/returns/receipt', { params: { code: value.trim() } });
       setReceipt(data.data); setCode(data.data.transaction_code); setMethod(source);
@@ -52,7 +51,7 @@ export default function ReturnInspectionDesk({ onProcessed }) {
   const findingsReady = condition !== '' && (condition === 'Good' || conditionNotes.trim() !== '') && (fee <= 0 || paid !== '');
   const rejectionReason = (reason.trim() || [condition !== 'Good' && conditionNotes.trim(), fee > 0 && paid === 'no' && 'Overdue fee not paid'].filter(Boolean).join('; ')).slice(0, 500);
   const inWindow = awaiting && now >= new Date(receipt.handover_starts_at).getTime() && now <= new Date(receipt.handover_ends_at).getTime();
-  const canAccept = findingsReady && condition === 'Good' && (fee <= 0 || paid === 'yes') && checked && studentId.trim() && inWindow;
+  const canAccept = findingsReady && condition === 'Good' && (fee <= 0 || paid === 'yes') && checked && inWindow;
 
   const submit = async status => {
     if (processing.current) return;
@@ -62,7 +61,7 @@ export default function ReturnInspectionDesk({ onProcessed }) {
         code: method === 'qr' ? receipt.qr_payload : receipt.transaction_code,
         status, method, condition_on_return: condition, condition_notes: condition === 'Good' ? undefined : conditionNotes.trim(),
         overdue_fee_paid: paid === 'yes', quoted_overdue_fee: fee,
-        student_id_number: studentId.trim() || undefined, equipment_checked: checked,
+        equipment_checked: checked,
         remarks: status === 'Rejected' ? rejectionReason : reason.trim() || undefined,
       });
       setReceipt(data.data); setNotice(data.message); onProcessed();
@@ -87,9 +86,8 @@ export default function ReturnInspectionDesk({ onProcessed }) {
         <span className="receipt-step">Inspection findings</span><h3>Review the return</h3>
         <p className="receipt-help">Complete each section below. An administrator will verify your decision before the loan is closed.</p>
         <div className="receipt-form-section">
-        <h4>Student and equipment check</h4>
-        <label>Student ID presented<input value={studentId} maxLength={20} onChange={event => setStudentId(event.target.value)} disabled={busy} placeholder="ID on the physical student card" /></label>
-        <label className="handover-check"><input type="checkbox" checked={checked} onChange={event => setChecked(event.target.checked)} disabled={busy} /><span>I verified the student's identity and inspected the equipment, quantities and accessories.</span></label>
+        <h4>Equipment check</h4>
+        <label className="handover-check"><input type="checkbox" checked={checked} onChange={event => setChecked(event.target.checked)} disabled={busy} /><span>I checked the student against the ID shown on the receipt and inspected the equipment, quantities and accessories.</span></label>
         </div>
         <div className="receipt-form-section">
         <fieldset className="return-question"><legend>Is the equipment in good condition?</legend>

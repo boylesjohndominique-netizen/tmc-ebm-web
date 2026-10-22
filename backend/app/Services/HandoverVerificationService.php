@@ -6,19 +6,24 @@ use Illuminate\Validation\ValidationException;
 
 class HandoverVerificationService
 {
-    public function verify(?string $expectedStudentId, array $data): array
+    /**
+     * Verify a handover using the student ID already recorded on the receipt.
+     *
+     * Staff identify the student against the receipt shown in the system, so
+     * the ID is never retyped and cannot drift from the issued receipt.
+     */
+    public function verify(?string $receiptStudentId, array $data): array
     {
-        $expected = strtoupper(trim($expectedStudentId ?? ''));
-        $provided = strtoupper(trim($data['student_id_number'] ?? ''));
-        if ($expected === '' || $provided !== $expected) {
+        $studentId = strtoupper(trim($receiptStudentId ?? ''));
+        if ($studentId === '') {
             throw ValidationException::withMessages([
-                'student_id_number' => 'The ID presented must match the student on this receipt. An administrator must correct a missing or incorrect student ID before handover.',
+                'code' => 'This receipt has no student ID on record. An administrator must add the student ID before handover.',
             ]);
         }
         if (! filter_var($data['equipment_checked'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             throw ValidationException::withMessages(['equipment_checked' => 'Staff must inspect all equipment and accessories before confirming handover.']);
         }
 
-        return ['verified_student_id' => $expected, 'equipment_checked' => true];
+        return ['verified_student_id' => $studentId, 'equipment_checked' => true];
     }
 }

@@ -19,7 +19,6 @@ class ProcessReturnHandoverRequest extends FormRequest
             'status' => ['required', Rule::in(['Accepted', 'Rejected'])],
             'method' => ['required', Rule::in(['manual', 'qr'])],
             'remarks' => ['required_if:status,Rejected', 'nullable', 'string', 'max:500'],
-            'student_id_number' => ['required_if:status,Accepted', 'nullable', 'string', 'max:20'],
             'equipment_checked' => ['required_if:status,Accepted', 'accepted_if:status,Accepted'],
             'condition_on_return' => ['required', Rule::in(['Good', 'Damaged', 'Incomplete', 'NotPresented', 'Other'])],
             'condition_notes' => ['required_unless:condition_on_return,Good', 'nullable', 'string', 'max:1000'],

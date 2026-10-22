@@ -93,7 +93,7 @@ class ReturnHandoverTest extends TestCase
         return [
             'code' => $qr ? $return->receipt['qr_payload'] : $return->transaction_code,
             'status' => 'Accepted', 'method' => $qr ? 'qr' : 'manual',
-            'student_id_number' => '24-123456', 'equipment_checked' => true,
+            'equipment_checked' => true,
             'condition_on_return' => 'Good',
             'overdue_fee_paid' => false, 'quoted_overdue_fee' => 0,
         ];
@@ -172,17 +172,27 @@ class ReturnHandoverTest extends TestCase
         $this->assertSame(3, $this->equipment->fresh()->available_quantity);
     }
 
-    public function test_staff_cannot_confirm_wrong_students_or_uninspected_or_damaged_equipment(): void
+    public function test_uninspected_or_damaged_equipment_cannot_be_accepted(): void
     {
         $return = $this->approve($this->submit());
         $this->travel(2)->hours();
         Sanctum::actingAs($this->staff);
-        foreach ([['student_id_number' => 'WRONG-ID'], ['equipment_checked' => false], ['condition_on_return' => 'Damaged']] as $invalid) {
+        foreach ([['equipment_checked' => false], ['condition_on_return' => 'Damaged']] as $invalid) {
             $this->postJson('/api/admin/returns/handover', array_replace($this->confirmation($return), $invalid))->assertUnprocessable();
         }
         $this->assertSame('Approved', $return->fresh()->status);
         $this->assertSame('Approved', $this->borrowing->fresh()->status);
         $this->assertSame(3, $this->equipment->fresh()->available_quantity);
+    }
+
+    public function test_acceptance_uses_the_student_id_already_on_the_receipt(): void
+    {
+        $return = $this->approve($this->submit());
+        $this->travel(2)->hours();
+        Sanctum::actingAs($this->staff);
+        $this->postJson('/api/admin/returns/handover', array_replace($this->confirmation($return), [
+            'student_id_number' => 'WRONG-ID',
+        ]))->assertOk()->assertJsonPath('data.verified_student_id', '24-123456');
     }
 
     public function test_damaged_return_rejection_keeps_loan_open_and_reissued_receipts_are_unique(): void
