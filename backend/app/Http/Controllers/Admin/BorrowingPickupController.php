@@ -17,6 +17,8 @@ class BorrowingPickupController extends Controller
         ]);
         $borrowing = $service->find($data['code']);
         abort_unless($borrowing->receipt_snapshot, 404, 'An approval receipt has not been issued for this request.');
+        $service->expire($borrowing->id);
+        $borrowing->refresh();
 
         return new BorrowingReceiptResource($borrowing);
     }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\BorrowingRequest;
 use App\Models\Category;
 use App\Models\Equipment;
+use App\Models\Notification;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -140,25 +141,24 @@ class BorrowingPickupTest extends TestCase
         ])->assertOk()->assertJsonPath('data.pickup_status', 'Received');
     }
 
-    public function test_early_or_expired_scans_are_blocked_and_no_show_rejection_restores_stock_once(): void
+    public function test_expired_receipts_cannot_be_processed_and_reserved_stock_is_released_once(): void
     {
         $borrowing = $this->approve($this->submit());
         Sanctum::actingAs($this->staff);
         $scan = ['code' => $borrowing->receipt['qr_payload'], 'status' => 'Received', 'method' => 'qr'];
-        $this->postJson('/api/admin/borrowings/pickup', $scan)->assertConflict();
         $this->travel(4)->hours();
         $this->postJson('/api/admin/borrowings/pickup', $scan)->assertConflict();
         $reject = [
             'code' => $borrowing->transaction_code, 'status' => 'Rejected',
             'method' => 'manual', 'remarks' => 'Student did not arrive during the pickup window.',
         ];
-        $this->postJson('/api/admin/borrowings/pickup', $reject)->assertOk()
-            ->assertJsonPath('data.status', 'Rejected')->assertJsonPath('data.pickup_status', 'Rejected');
         $this->postJson('/api/admin/borrowings/pickup', $reject)->assertConflict();
         $this->postJson('/api/admin/borrowings/pickup', $scan)->assertConflict();
         $this->assertSame(5, $this->equipment->fresh()->available_quantity);
         $this->assertSame($this->admin->id, $borrowing->fresh()->processed_by);
-        $this->assertDatabaseHas('notifications', ['user_id' => $this->admin->id, 'title' => 'Equipment Pickup Rejected']);
+        $this->assertSame('Rejected', $borrowing->fresh()->status);
+        $this->assertTrue($borrowing->fresh()->receipt['pickup_expired']);
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->student->id, 'title' => 'Pickup Time Expired']);
         Sanctum::actingAs($this->student);
         $this->postJson("/api/mobile/borrowings/{$borrowing->id}/return")->assertUnprocessable();
     }
@@ -242,5 +242,95 @@ class BorrowingPickupTest extends TestCase
         $this->postJson('/api/admin/borrowings/pickup', $payload)->assertConflict();
         $this->assertSame(5, $this->equipment->fresh()->available_quantity);
         $this->assertDatabaseHas('notifications', ['user_id' => $this->student->id, 'title' => 'Equipment Pickup Rejected']);
+    }
+
+    public function test_number_and_qr_receipts_can_be_confirmed_before_the_pickup_start_time(): void
+    {
+        foreach (['manual', 'qr'] as $method) {
+            $borrowing = $this->approve($this->submit());
+            $this->assertTrue(now()->lt($borrowing->pickup_starts_at));
+            $reservedStock = $this->equipment->fresh()->available_quantity;
+            Sanctum::actingAs($this->staff);
+            $this->postJson('/api/admin/borrowings/pickup', [
+                'code' => $method === 'qr' ? $borrowing->receipt['qr_payload'] : $borrowing->transaction_code,
+                'status' => 'Received', 'method' => $method,
+            ])->assertOk()->assertJsonPath('data.pickup_status', 'Received');
+            $this->assertSame($reservedStock, $this->equipment->fresh()->available_quantity);
+            $this->assertSame($this->staff->id, $borrowing->fresh()->pickup_processed_by);
+        }
+    }
+
+    public function test_staff_can_reject_a_number_receipt_before_the_pickup_start_time(): void
+    {
+        $borrowing = $this->approve($this->submit());
+        $this->assertTrue(now()->lt($borrowing->pickup_starts_at));
+        Sanctum::actingAs($this->staff);
+        $this->postJson('/api/admin/borrowings/pickup', [
+            'code' => $borrowing->transaction_code, 'method' => 'manual',
+            'status' => 'Rejected', 'remarks' => 'Student requested another pickup time.',
+        ])->assertOk()->assertJsonPath('data.pickup_status', 'Rejected');
+        $this->assertSame(5, $this->equipment->fresh()->available_quantity);
+    }
+
+    public function test_scheduled_expiration_notifies_the_student_once_and_allows_a_new_request(): void
+    {
+        $borrowing = $this->approve($this->submit());
+        $this->travel(4)->hours();
+        $this->artisan('borrowings:expire-pickups')->expectsOutput('Expired 1 pickup receipt(s).')->assertSuccessful();
+        $this->assertSame('Rejected', $borrowing->fresh()->status);
+        $this->assertTrue($borrowing->fresh()->receipt['pickup_expired']);
+        $this->assertNull($borrowing->fresh()->pickup_processed_by);
+        $this->assertSame(5, $this->equipment->fresh()->available_quantity);
+        $this->artisan('borrowings:expire-pickups')->expectsOutput('Expired 0 pickup receipt(s).')->assertSuccessful();
+        $this->assertSame(1, Notification::where('user_id', $this->student->id)->where('title', 'Pickup Time Expired')->count());
+        Sanctum::actingAs($this->student);
+        $this->getJson('/api/mobile/notifications')->assertOk()->assertJsonFragment(['title' => 'Pickup Time Expired']);
+        $notification = Notification::where('title', 'Pickup Time Expired')->firstOrFail();
+        $this->assertStringContainsString($borrowing->transaction_code, $notification->message);
+        $this->assertStringContainsString('Please submit a new borrowing request for another pickup time.', $notification->message);
+        $next = $this->submit();
+        $this->assertNotSame($borrowing->transaction_code, $next->transaction_code);
+        $this->assertSame('Pending', $next->status);
+    }
+
+    public function test_receipt_lookup_expires_an_uncollected_pickup_when_the_scheduler_has_not_run(): void
+    {
+        $borrowing = $this->approve($this->submit());
+        $this->travel(4)->hours();
+        Sanctum::actingAs($this->staff);
+        $this->getJson('/api/admin/borrowings/receipt?code='.$borrowing->receipt['qr_payload'])->assertOk()
+            ->assertJsonPath('data.pickup_expired', true)->assertJsonPath('data.pickup_status', 'Rejected');
+        $this->assertSame(5, $this->equipment->fresh()->available_quantity);
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->student->id, 'title' => 'Pickup Time Expired']);
+    }
+
+    public function test_expiration_starts_at_the_deadline_and_does_not_send_early_notifications(): void
+    {
+        $borrowing = $this->approve($this->submit());
+        $this->travelTo($borrowing->pickup_ends_at->copy()->subSecond());
+        $this->artisan('borrowings:expire-pickups')->expectsOutput('Expired 0 pickup receipt(s).')->assertSuccessful();
+        $this->assertSame('Awaiting', $borrowing->fresh()->pickup_status);
+        $this->travelTo($borrowing->pickup_ends_at);
+        $this->artisan('borrowings:expire-pickups')->expectsOutput('Expired 1 pickup receipt(s).')->assertSuccessful();
+        $this->assertSame('Rejected', $borrowing->fresh()->pickup_status);
+    }
+
+    public function test_pending_requests_collected_equipment_and_future_deadlines_are_not_expired(): void
+    {
+        $pending = $this->submit();
+        $received = $this->approve($this->submit());
+        $future = $this->approve($this->submit());
+        $future->update(['pickup_ends_at' => now()->addHours(6)]);
+        Sanctum::actingAs($this->staff);
+        $this->postJson('/api/admin/borrowings/pickup', [
+            'code' => $received->transaction_code, 'method' => 'manual', 'status' => 'Received',
+        ])->assertOk();
+        $this->travel(4)->hours();
+        $this->artisan('borrowings:expire-pickups')->expectsOutput('Expired 0 pickup receipt(s).')->assertSuccessful();
+        $this->assertSame('Pending', $pending->fresh()->status);
+        $this->assertSame('Received', $received->fresh()->pickup_status);
+        $this->assertSame('Awaiting', $future->fresh()->pickup_status);
+        $this->assertSame(1, $this->equipment->fresh()->available_quantity);
+        $this->assertSame(0, Notification::where('title', 'Pickup Time Expired')->count());
     }
 }

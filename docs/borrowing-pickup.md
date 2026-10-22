@@ -2,8 +2,8 @@
 
 1. The student submits a borrowing request. The API assigns a unique random 12-digit transaction number and a separate random QR token.
 2. An admin approves or rejects the request. Approval requires a future pickup window within the borrowing and return dates, reserves stock, and notifies the student. The mobile app displays the approval receipt under **Requests → Receipt**.
-3. Equipment staff open **Borrowing Requests → Equipment handover**. Searching the 12-digit number or scanning the QR code opens the receipt for review, including the student's name, ID, and equipment details. Staff then confirm or reject pickup without entering the student ID again. Scanning alone does not confirm pickup. Confirmation is available during the approved pickup window.
-4. Staff reject pickups with a reason after either number lookup or QR scanning. Rejection releases reserved stock and notifies both the student and administrators. A receipt can be processed once; repeated or expired scans cannot confirm pickup.
+3. Equipment staff open **Borrowing Requests → Equipment handover**. Searching the 12-digit number or scanning the QR code opens the receipt for review, including the student's name, ID, and equipment details. Staff can confirm or reject pickup before its scheduled start without entering the student ID again. Scanning alone does not confirm pickup. The pickup end time remains the deadline.
+4. Staff reject pickups with a reason after either number lookup or QR scanning. Rejection releases reserved stock and notifies both the student and administrators. At the pickup deadline, an uncollected receipt expires, reserved stock is released, and the student receives a **Pickup Time Expired** mobile notification explaining that pickup is no longer allowed and a new borrowing request is needed for another pickup time. Collected equipment is unaffected. A receipt can be processed or expired only once.
 5. Students can request returns only after staff confirm receipt.
 
 ## Equipment pickup location and loan duration
@@ -35,6 +35,8 @@ Run `php artisan migrate` from `backend/`, `npm ci` from `frontend/`, and `flutt
 The `borrowings.process` and `returns.process` permissions control approvals. Separate `borrowings.handover` and `returns.handover` permissions control staff receipt lookup and handover. Staff receive handover permissions by default; existing explicit permission overrides remain effective and can be changed in the Permissions page. Students cannot access these staff endpoints.
 
 Camera scanning requires HTTPS or localhost and camera permission. Manual number lookup remains available. Pickup timestamps are transmitted as ISO 8601 instants and displayed in the viewer's time zone; borrowing/return date bounds use Philippine time.
+
+Keep the Laravel scheduler running (`php artisan schedule:work` locally, or invoke `php artisan schedule:run` every minute in production). It runs `borrowings:expire-pickups` each minute to send pickup-expiry notifications. Receipt lookup and processing also check for expiry, so an expired receipt cannot be used between scheduled runs.
 
 ## Verification
 
