@@ -62,7 +62,7 @@ export default function BorrowingPickupDesk({ onProcessed }) {
   };
 
   const awaiting = receipt?.status === 'Approved' && receipt?.pickup_status === 'Awaiting';
-  const inWindow = awaiting && now >= new Date(receipt.pickup_starts_at).getTime() && now <= new Date(receipt.pickup_ends_at).getTime();
+  const beforeDeadline = awaiting && now < new Date(receipt.pickup_ends_at).getTime();
 
   return <section className="pickup-desk" aria-label="Equipment handover">
     <div className="receipt-desk-heading"><span className="receipt-desk-icon"><PackageCheck size={23} /></span><div><h2>Equipment handover</h2><p>Find the receipt, review the student and equipment details, then confirm or reject pickup.</p></div></div>
@@ -72,20 +72,20 @@ export default function BorrowingPickupDesk({ onProcessed }) {
     {busy && <p className="receipt-progress" role="status">Processing receipt…</p>}
     {!receipt && !busy && <div className="receipt-empty"><FileSearch size={26} /><div><b>Find a receipt to get started</b><p>The student's details and pickup actions will appear here.</p></div></div>}
     {receipt && <div className="receipt-review-layout">
-      <ReceiptSummary receipt={receipt} awaiting={awaiting} inWindow={inWindow} />
+      <ReceiptSummary receipt={receipt} awaiting={awaiting} inWindow={beforeDeadline} />
       <section className="receipt-decision" aria-label="Pickup decision">
         {awaiting ? <>
           <span className="receipt-step">Staff decision</span><h3>Complete the pickup</h3>
           <p className="receipt-help">The student's identity is shown on the receipt. Confirm when the equipment has been handed over, or give a reason to reject pickup.</p>
-          {!inWindow && <p className="receipt-callout" role="status">Confirmation is available during the approved pickup window shown on the receipt.</p>}
+          {!beforeDeadline && <p className="receipt-callout" role="status">The pickup time has ended. The student must submit a new borrowing request for another pickup time.</p>}
           <label>Rejection reason<textarea value={remarks} maxLength={500} onChange={event => setRemarks(event.target.value)} disabled={busy} placeholder="Required only when rejecting pickup" rows={3} /></label>
           <div className="receipt-decision-actions">
-            <button type="button" className="btn btn-primary" disabled={busy || !inWindow} onClick={() => process('Received')}>Confirm pickup</button>
-            <button type="button" className="btn btn-danger" disabled={busy || !remarks.trim()} onClick={() => process('Rejected')}>Reject pickup</button>
+            <button type="button" className="btn btn-primary" disabled={busy || !beforeDeadline} onClick={() => process('Received')}>Confirm pickup</button>
+            <button type="button" className="btn btn-danger" disabled={busy || !beforeDeadline || !remarks.trim()} onClick={() => process('Rejected')}>Reject pickup</button>
           </div>
           <p className="receipt-help">Rejecting releases the reserved equipment and notifies the student and administrators.</p>
         </> : <>
-          <span className="receipt-step">Pickup record</span><h3>{receipt.pickup_status === 'Received' ? 'Pickup confirmed' : receipt.pickup_status === 'Rejected' ? 'Pickup rejected' : 'Receipt status'}</h3>
+          <span className="receipt-step">Pickup record</span><h3>{receipt.pickup_expired ? 'Pickup time expired' : receipt.pickup_status === 'Received' ? 'Pickup confirmed' : receipt.pickup_status === 'Rejected' ? 'Pickup rejected' : 'Receipt status'}</h3>
           <dl className="receipt-notes">
             {receipt.pickup_processed_at && <div><dt>Processed at</dt><dd>{fmtDateTime(receipt.pickup_processed_at)}</dd></div>}
             {receipt.pickup_staff_name && <div><dt>Staff</dt><dd>{receipt.pickup_staff_name}</dd></div>}

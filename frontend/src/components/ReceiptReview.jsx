@@ -36,7 +36,7 @@ export function ReceiptSummary({ receipt, isReturn = false, awaiting, inWindow }
     </dl>
     <div className={`receipt-window ${awaiting && inWindow ? 'is-open' : ''}`}>
       <CalendarClock size={19} aria-hidden="true" />
-      <div><b>{isReturn ? 'Return' : 'Pickup'} window</b><p>{fmtDateTime(startsAt)} <span aria-hidden="true">–</span> {fmtDateTime(endsAt)}</p><span>{awaiting ? (inWindow ? 'Open now' : 'Outside the approved window') : status}</span></div>
+      <div><b>{isReturn ? 'Return window' : 'Scheduled pickup'}</b><p>{fmtDateTime(startsAt)} <span aria-hidden="true">–</span> {fmtDateTime(endsAt)}</p><span>{awaiting ? (inWindow ? (isReturn ? 'Open now' : 'Ready for staff review') : (isReturn ? 'Outside the approved window' : 'Pickup time expired')) : (receipt.pickup_expired ? 'Pickup time expired' : status)}</span></div>
     </div>
     <h4 className="receipt-items-heading"><Package size={16} aria-hidden="true" /> Equipment to {isReturn ? 'return' : 'release'}</h4>
     <ul className="receipt-items">
