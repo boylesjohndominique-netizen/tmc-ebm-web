@@ -1,12 +1,8 @@
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import ConnectionBadge from './ConnectionBadge';
-
-function initials(name = '') {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  return (parts[0][0] + (parts[parts.length - 1][0] || '')).toUpperCase();
-}
+import UserAvatar from './UserAvatar';
 
 /**
  * Floating navbar. The notification button was removed — notifications
@@ -23,10 +19,10 @@ export default function Navbar() {
       <div className="navbar-actions">
         <ConnectionBadge />
         <ThemeToggle />
-        <div className="navbar-avatar" title={role ? `${fullName} — ${role}` : fullName}>
-          <div className="avatar-initials">{initials(fullName || user?.username)}</div>
+        <NavLink to="/admin/profile" className="navbar-avatar" aria-label="Open profile" title={role ? `Profile — ${fullName} — ${role}` : 'Profile'}>
+          <UserAvatar path={user?.profile_photo_path} name={fullName || user?.username} />
           <div className="user-mini">{fullName || user?.username}</div>
-        </div>
+        </NavLink>
       </div>
     </header>
   );

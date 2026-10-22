@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Events\UserBanned;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\RejectVerificationRequest;
 use App\Models\BorrowingRequest;
 use App\Models\Notification;
 use App\Models\ReturnRequest;
@@ -127,28 +128,64 @@ class UserManagementController extends Controller
      */
     public function verify(Request $request, User $user)
     {
-        if (! $user->isPending()) {
-            return response()->json(['message' => 'Only pending accounts can be verified.'], 422);
-        }
+        DB::transaction(function () use ($request, $user) {
+            $user = User::lockForUpdate()->findOrFail($user->id);
+            $this->ensureReviewable($user);
 
-        // Verification only ever happens here — ban/unban must not touch it.
-        $user->update([
-            'account_status' => 'Active',
-            'verified_at' => now(),
-            'verified_by' => $request->user()->id,
-        ]);
+            // Verification only ever happens here — ban/unban must not touch it.
+            $user->update([
+                'account_status' => 'Active',
+                'verified_at' => now(),
+                'verified_by' => $request->user()->id,
+                'id_rejection_reason' => null,
+            ]);
 
-        Notification::create([
-            'user_id' => $user->id,
-            'title' => 'Account Verified',
-            'message' => 'Your account has been verified. You can now log in to the mobile app.',
-            'type' => 'Success',
-        ]);
+            Notification::create([
+                'user_id' => $user->id,
+                'title' => 'Account Verified',
+                'message' => 'Your account has been verified. You can now borrow equipment.',
+                'type' => 'Success',
+            ]);
+        });
 
         return response()->json([
             'message' => 'Account verified successfully.',
             'user' => $user->fresh()->load('role'),
         ]);
+    }
+
+    public function rejectVerification(RejectVerificationRequest $request, User $user)
+    {
+        $reason = $request->validated('reason');
+
+        DB::transaction(function () use ($user, $reason) {
+            $user = User::lockForUpdate()->findOrFail($user->id);
+            $this->ensureReviewable($user);
+            $user->update(['id_rejection_reason' => $reason]);
+
+            Notification::create([
+                'user_id' => $user->id,
+                'title' => 'ID Verification Rejected',
+                'message' => 'Your ID verification was rejected. Reason: '.$reason.' Please submit new front and back ID photos in Profile.',
+                'type' => 'Account',
+            ]);
+        });
+
+        return response()->json([
+            'message' => 'Verification rejected. The student has been notified with the reason.',
+            'user' => $user->fresh()->load('role'),
+        ]);
+    }
+
+    private function ensureReviewable(User $user): void
+    {
+        abort_unless(
+            $user->isStudent() && $user->isPending() && ! $user->isIdVerified()
+                && $user->id_submitted_at && $user->id_front_path && $user->id_back_path
+                && ! $user->id_rejection_reason,
+            422,
+            'Only pending student ID submissions awaiting review can be accepted or rejected.'
+        );
     }
 
     /**

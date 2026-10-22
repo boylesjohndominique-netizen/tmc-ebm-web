@@ -36,6 +36,14 @@ export const equipmentImageUrl = (path) => {
   return `${base}/equipment-media/${encodeURIComponent(filename)}`;
 };
 
+export const userAvatarUrl = (path) => {
+  if (!path || typeof path !== 'string') return null;
+  const filename = path.split(/[\\/]/).pop();
+  if (!filename) return null;
+  const base = (api.defaults.baseURL || '/api').replace(/\/$/, '');
+  return `${base}/user-avatar/${encodeURIComponent(filename)}`;
+};
+
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;

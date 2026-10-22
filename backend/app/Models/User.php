@@ -39,6 +39,7 @@ class User extends Authenticatable implements CanResetPassword
         'id_front_path',
         'id_back_path',
         'id_submitted_at',
+        'id_rejection_reason',
     ];
 
     protected $hidden = [

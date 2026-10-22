@@ -205,6 +205,9 @@ Route::middleware('auth:sanctum')->group(function () {
         'password',
     ]);
 
+    Route::post('/profile/avatar', [MobileController::class, 'updateAvatar']);
+    Route::delete('/profile/avatar', [ProfileController::class, 'destroyAvatar']);
+
     // =================================================
     // ADMIN ROUTES
     // =================================================
@@ -243,6 +246,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/users/{user}/verify', [
                 UserManagementController::class,
                 'verify',
+            ])->middleware('perm:users.verify');
+
+            Route::put('/users/{user}/reject-verification', [
+                UserManagementController::class,
+                'rejectVerification',
             ])->middleware('perm:users.verify');
 
             // Ban / unban any non-admin account

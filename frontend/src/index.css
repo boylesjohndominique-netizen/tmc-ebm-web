@@ -557,6 +557,16 @@ select:focus-visible {
 }
 .navbar-avatar:hover { box-shadow: var(--shadow-sm); border-color: var(--border); }
 
+.user-avatar-photo { object-fit: cover; flex-shrink: 0; }
+
+.profile-photo-controls {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .avatar-initials {
   width: 34px;
   height: 34px;
@@ -2216,6 +2226,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .profile-avatar {
   width: 88px;
   height: 88px;
+  font-size: 28px;
+  font-weight: 800;
   margin: 6px auto 14px;
   border-radius: 50%;
   display: grid;

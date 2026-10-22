@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Boxes, Package, ClipboardList, RotateCcw, Bell, Users, BarChart3, ShieldCheck, Settings, LogOut, X, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Boxes, Package, ClipboardList, RotateCcw, Bell, Users, GraduationCap, UserCog, BarChart3, Settings, LogOut, X, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -17,7 +17,16 @@ import { useConfirm } from '../context/ConfirmContext';
  */
 const adminNav = [
   { type: 'link', to: '/admin', label: 'Dashboard', icon: LayoutDashboard, module: 'dashboard' },
-  { type: 'link', to: '/admin/users', label: 'Users', icon: Users, module: 'users' },
+  {
+    type: 'group',
+    id: 'users',
+    label: 'User Management',
+    icon: Users,
+    children: [
+      { to: '/admin/students', label: 'Student Management', icon: GraduationCap, module: 'users' },
+      { to: '/admin/staff', label: 'Staff Management', icon: UserCog, module: 'users' },
+    ],
+  },
   {
     type: 'group',
     id: 'equipment',
@@ -34,12 +43,6 @@ const adminNav = [
   { type: 'link', to: '/admin/settings', label: 'Settings', icon: Settings, module: 'settings' },
 ];
 
-function initials(name = '') {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  return (parts[0][0] + (parts[parts.length - 1][0] || '')).toUpperCase();
-}
-
 /**
  * Floating navigation — a slim rail of circular icon buttons on desktop
  * and, on mobile, the same markup becomes the floating panel with names
@@ -49,7 +52,7 @@ function initials(name = '') {
  * rail's scroll container.
  */
 export default function Sidebar({ open, onClose }) {
-  const { logout, can, isSuperAdmin, user } = useAuth();
+  const { logout, can } = useAuth();
   const { unread } = useNotifications();
   const confirm = useConfirm();
   const location = useLocation();
@@ -67,8 +70,6 @@ export default function Sidebar({ open, onClose }) {
     const group = nav.find(item => item.type === 'group' && item.children.some(c => c.to === location.pathname));
     if (group) setOpenGroup(group.id);
   }, [location.pathname]);
-
-  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '?';
 
   const showTip = label => e => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -162,38 +163,10 @@ export default function Sidebar({ open, onClose }) {
           );
         })}
 
-        {isSuperAdmin && (
-          <NavLink
-            to="/admin/permissions"
-            onClick={onClose}
-            onMouseEnter={showTip('Permissions')}
-            onMouseLeave={hideTip}
-            onFocus={showTip('Permissions')}
-            onBlur={hideTip}
-          >
-            <span className="nav-icon"><ShieldCheck size={19} /></span>
-            <span className="nav-name">Permissions</span>
-          </NavLink>
-        )}
-
-        {!nav.length && !isSuperAdmin && (
+        {!nav.length && (
           <span className="sidebar-empty">No modules available</span>
         )}
       </nav>
-
-      {/* Profile — circular avatar button, navigates to the Profile page */}
-      <NavLink
-        to="/admin/profile"
-        className="profile-link"
-        onClick={onClose}
-        onMouseEnter={showTip('Profile')}
-        onMouseLeave={hideTip}
-        onFocus={showTip('Profile')}
-        onBlur={hideTip}
-      >
-        <span className="avatar-initials">{initials(fullName)}</span>
-        <span className="nav-name">Profile</span>
-      </NavLink>
 
       <button
         className="logout-link"

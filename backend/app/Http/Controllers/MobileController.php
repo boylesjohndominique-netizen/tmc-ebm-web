@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateAvatarRequest;
 use App\Models\BorrowingRequest;
 use App\Models\Equipment;
 use App\Models\Notification;
@@ -314,6 +315,7 @@ class MobileController extends Controller
             'id_front_path' => $frontPath,
             'id_back_path' => $backPath,
             'id_submitted_at' => now(),
+            'id_rejection_reason' => null,
         ]);
 
         // Queue a review notification for every administrator.
@@ -331,6 +333,9 @@ class MobileController extends Controller
         return response()->json([
             'message' => 'ID photos submitted. An administrator will review your verification.',
             'id_submitted_at' => $user->id_submitted_at?->toISOString(),
+            'user' => array_merge($user->load('role')->toArray(), [
+                'is_id_verified' => $user->isIdVerified(),
+            ]),
         ], 201);
     }
 
@@ -414,19 +419,16 @@ class MobileController extends Controller
     /**
      * Upload or replace the signed-in user's profile avatar directly.
      */
-    public function updateAvatar(Request $request)
+    public function updateAvatar(UpdateAvatarRequest $request)
     {
-        $request->validate([
-            'avatar' => ['required', 'image', 'max:5120'],
-        ]);
-
         $user = $request->user();
-        if ($user->profile_photo_path && Storage::disk('local')->exists($user->profile_photo_path)) {
-            Storage::disk('local')->delete($user->profile_photo_path);
-        }
-
+        $previousPath = $user->profile_photo_path;
         $path = $request->file('avatar')->store('user-avatars', 'local');
+        abort_unless($path, 500, 'Unable to save the profile picture. Please try again.');
         $user->update(['profile_photo_path' => $path]);
+        if ($previousPath) {
+            Storage::disk('local')->delete($previousPath);
+        }
         $fresh = $user->fresh()->load('role');
 
         return response()->json([

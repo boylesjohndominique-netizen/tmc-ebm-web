@@ -1,10 +1,11 @@
-import { useEffect,useState } from 'react';
-import { Eye, EyeOff, KeyRound, Save, UserRound } from 'lucide-react';
+import { useEffect,useRef,useState } from 'react';
+import { Eye, EyeOff, ImagePlus, KeyRound, Save, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import Skeleton from '../../components/Skeleton';
+import UserAvatar from '../../components/UserAvatar';
 import { fmtDate } from '../../utils/datetime';
 
 export default function Profile(){
@@ -18,10 +19,59 @@ export default function Profile(){
   const [msg,setMsg]=useState(''); const [error,setError]=useState('');
   const [pwMsg,setPwMsg]=useState(''); const [pwError,setPwError]=useState('');
   const [busy,setBusy]=useState(false);
+  const photoInput=useRef(null);
+  const [photo,setPhoto]=useState(null);
+  const [photoPreview,setPhotoPreview]=useState(null);
+  const [photoBusy,setPhotoBusy]=useState(false);
+  const [photoMessage,setPhotoMessage]=useState('');
+  const [photoError,setPhotoError]=useState('');
+  const [loadError,setLoadError]=useState('');
 
   useEffect(()=>{ api.get('/profile').then(r=>{ setUser(r.data); setForm({
     first_name:r.data.first_name, middle_name:r.data.middle_name||'', last_name:r.data.last_name,
-    email:r.data.email, contact_number:r.data.contact_number||'' }); }); },[]);
+    email:r.data.email, contact_number:r.data.contact_number||'' }); }).catch(()=>setLoadError('Unable to load your profile. Please refresh the page.')); },[]);
+
+  useEffect(()=>{
+    if(!photo){setPhotoPreview(null);return;}
+    const url=URL.createObjectURL(photo);
+    setPhotoPreview(url);
+    return ()=>URL.revokeObjectURL(url);
+  },[photo]);
+
+  const choosePhoto=e=>{
+    const file=e.target.files?.[0];
+    e.target.value='';
+    if(!file)return;
+    setPhotoError('');setPhotoMessage('');
+    if(!['image/jpeg','image/png','image/webp','image/gif','image/bmp'].includes(file.type)){
+      setPhotoError('Choose a JPG, PNG, WEBP, GIF, or BMP image.');return;
+    }
+    if(file.size>5*1024*1024){setPhotoError('Choose an image that is 5 MB or smaller.');return;}
+    setPhoto(file);
+  };
+
+  const savePhoto=async()=>{
+    if(!photo||photoBusy)return;
+    setPhotoBusy(true);setPhotoError('');setPhotoMessage('');
+    try{
+      const payload=new FormData();payload.append('avatar',photo);
+      const {data}=await api.post('/profile/avatar',payload);
+      setUser(data.user);setPhoto(null);await refreshUser();
+      setPhotoMessage(data.message||'Profile picture updated.');
+    }catch(err){setPhotoError(err.response?.data?.errors?.avatar?.[0]||err.response?.data?.message||'Unable to upload your profile picture. Please try again.');}
+    finally{setPhotoBusy(false);}
+  };
+
+  const removePhoto=async()=>{
+    if(photoBusy||!await confirm({title:'Remove profile picture?',message:'Your initials will be shown in place of your profile picture.',confirmLabel:'Remove Picture',tone:'danger'}))return;
+    setPhotoBusy(true);setPhotoError('');setPhotoMessage('');
+    try{
+      const {data}=await api.delete('/profile/avatar');
+      setUser(data.user);setPhoto(null);await refreshUser();
+      setPhotoMessage(data.message||'Profile picture removed.');
+    }catch(err){setPhotoError(err.response?.data?.message||'Unable to remove your profile picture. Please try again.');}
+    finally{setPhotoBusy(false);}
+  };
 
   const save=async e=>{
     e.preventDefault(); setBusy(true); setMsg(''); setError('');
@@ -54,14 +104,26 @@ export default function Profile(){
     } finally{ setBusy(false); }
   };
 
-  if(!user) return <div className="profile-page"><div className="page-heading"><div><h1>My Profile</h1><p>Manage your account information and security.</p></div></div><div className="profile-grid"><div className="panel"><Skeleton variant="cards" cards={1} /></div><div className="panel"><Skeleton rows={4} /></div><div className="panel"><Skeleton rows={3} /></div></div></div>;
+  if(!user) return <div className="profile-page"><div className="page-heading"><div><h1>My Profile</h1><p>Manage your account information and security.</p></div></div>{loadError?<div className="alert error" role="alert">{loadError}</div>:<div className="profile-grid"><div className="panel"><Skeleton variant="cards" cards={1} /></div><div className="panel"><Skeleton rows={4} /></div><div className="panel"><Skeleton rows={3} /></div></div>}</div>;
 
   return <div className="profile-page">
     <div className="page-heading"><div><h1>My Profile</h1><p>Manage your account information and security.</p></div></div>
 
     <div className="profile-grid">
       <section className="panel profile-summary">
-        <div className="profile-avatar"><UserRound size={42}/></div>
+        <UserAvatar path={user.profile_photo_path} src={photoPreview} name={[user.first_name,user.last_name].filter(Boolean).join(' ')||user.username} className="profile-avatar" />
+        <div className="profile-photo-controls">
+          <input ref={photoInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp" aria-label="Choose profile picture" onChange={choosePhoto} hidden disabled={busy||photoBusy}/>
+          <button type="button" className="btn btn-secondary small" disabled={busy||photoBusy} onClick={()=>photoInput.current?.click()}><ImagePlus size={15}/>{user.profile_photo_path?'Change Picture':'Choose Picture'}</button>
+          {photo&&<>
+            <button type="button" className="btn btn-primary small" disabled={busy||photoBusy} onClick={savePhoto}><Save size={15}/>{photoBusy?'Uploading...':'Save Picture'}</button>
+            <button type="button" className="btn btn-secondary small" disabled={busy||photoBusy} onClick={()=>{setPhoto(null);setPhotoError('');}}>Cancel</button>
+          </>}
+          {!photo&&user.profile_photo_path&&<button type="button" className="btn btn-danger small" disabled={busy||photoBusy} onClick={removePhoto}><Trash2 size={15}/>{photoBusy?'Removing...':'Remove Picture'}</button>}
+        </div>
+        <p className="small-note">JPG, PNG, WEBP, GIF, or BMP. Maximum 5 MB.</p>
+        {photoMessage&&<div className="alert success" role="status">{photoMessage}</div>}
+        {photoError&&<div className="alert error" role="alert">{photoError}</div>}
         <h2>{[form.first_name,form.middle_name].filter(Boolean).join(' ')} {form.last_name}</h2>
         <span className="role-chip">{user.role?.name}</span>
         <div className="detail-list">
@@ -85,7 +147,7 @@ export default function Profile(){
             <label>Contact Number<input value={form.contact_number} onChange={e=>setForm({...form,contact_number:e.target.value})}/></label>
           </div>
           <p className="muted small-note">Username and role can only be changed by an administrator.</p>
-          <button className="btn btn-primary" disabled={busy}><Save size={16}/> Save Changes</button>
+          <button className="btn btn-primary" disabled={busy||photoBusy}><Save size={16}/> Save Changes</button>
         </form>
       </section>
 
@@ -118,7 +180,7 @@ export default function Profile(){
               </button>
             </div>
           </label>
-          <button className="btn btn-primary" disabled={busy}><KeyRound size={16}/> Change Password</button>
+          <button className="btn btn-primary" disabled={busy||photoBusy}><KeyRound size={16}/> Change Password</button>
         </form>
       </section>
     </div>

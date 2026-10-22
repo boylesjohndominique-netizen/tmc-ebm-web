@@ -1,6 +1,6 @@
 import { useCallback,useEffect,useState} from 'react';
 import { Link } from 'react-router-dom';
-import { Ban, CheckCircle2, Eye, EyeOff, IdCard, Pencil, RotateCcw, ShieldBan, Trash2, UserPlus, UsersRound } from 'lucide-react';
+import { Ban, CheckCircle2, Eye, EyeOff, IdCard, Pencil, RotateCcw, ShieldBan, ShieldCheck, Trash2, UserPlus, UsersRound, XCircle } from 'lucide-react';
 import api from '../../services/api';
 import Modal from '../../components/Modal';
 import SearchBar from '../../components/SearchBar';
@@ -54,7 +54,8 @@ function IdPhoto({ userId, side }) {
   );
 }
 
-export default function Users(){
+export default function Users({audience='students',embedded=false,onManagePermissions}){
+  const isStudentPage=audience==='students';
   const { can } = useAuth();
   const confirm = useConfirm();
   const [items,setItems]=useState([]);
@@ -69,12 +70,18 @@ export default function Users(){
   const [form,setForm]=useState(emptyForm);
   const [banning,setBanning]=useState(null);    // user being banned
   const [banReason,setBanReason]=useState('');
+  const [rejecting,setRejecting]=useState(null);
+  const [rejectionReason,setRejectionReason]=useState('');
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [busy,setBusy]=useState(false);
 
   const [loading,setLoading]=useState(true);
-  const load=useCallback(()=>api.get('/admin/users').then(r=>setItems(r.data)).finally(()=>setLoading(false)),[]);
+  const [loadError,setLoadError]=useState('');
+  const load=useCallback(()=>api.get('/admin/users')
+    .then(r=>{setItems(r.data.filter(x=>isStudentPage?x.role?.name==='Student':['Administrator','Staff','Faculty'].includes(x.role?.name)));setLoadError('');})
+    .catch(()=>setLoadError(`Unable to load ${isStudentPage?'student':'staff'} accounts.`))
+    .finally(()=>setLoading(false)),[isStudentPage]);
   useEffect(()=>{load()},[load]);
 
   // Live roster: new registrations, verifications and bans pushed by staff
@@ -89,7 +96,7 @@ export default function Users(){
 
   const openEdit=(x,fromDetail=false)=>{ setError(''); setForm({first_name:x.first_name,middle_name:x.middle_name||'',last_name:x.last_name,role:x.role?.name||'Faculty',username:x.username,email:x.email,contact_number:x.contact_number||'',password:''}); setEditing(x); if(fromDetail) setDetail(null); // avoid stacking the view + edit modals
   };
-  const closeAll=()=>{ setDetail(null); setEditing(null); setAdding(false); setBanning(null); setBanReason(''); setForm(emptyForm); setError(''); setShowPassword(false); };
+  const closeAll=()=>{ setDetail(null); setEditing(null); setAdding(false); setBanning(null); setBanReason(''); setRejecting(null); setRejectionReason(''); setForm(emptyForm); setError(''); setShowPassword(false); };
 
   const save=async e=>{
     e.preventDefault(); setBusy(true); setError('');
@@ -106,7 +113,7 @@ export default function Users(){
   const verify=async x=>{
     if(!await confirm({
       title:'Verify account?',
-      message:`Approve ${x.first_name} ${x.last_name}'s registration and grant them access?`,
+      message:`Approve ${x.first_name} ${x.last_name}'s ID verification and allow them to borrow equipment? They will be notified in the mobile app.`,
       confirmLabel:'Verify Account',
     })) return;
     setBusy(true); setError('');
@@ -116,6 +123,19 @@ export default function Users(){
   };
 
   const openBan=x=>{ setError(''); setBanReason(''); setBanning(x); };
+  const openReject=x=>{ setError(''); setDetail(null); setRejectionReason(''); setRejecting(x); };
+  const confirmReject=async e=>{
+    e.preventDefault();
+    if(busy)return;
+    const reason=rejectionReason.trim();
+    if(!reason){setError('Enter a reason for rejecting this verification.');return;}
+    setBusy(true); setError('');
+    try{
+      const r=await api.put(`/admin/users/${rejecting.id}/reject-verification`,{reason});
+      setNotice(r.data.message); closeAll(); load();
+    }catch(err){setError(err.response?.data?.message||'Unable to reject verification.');}
+    finally{setBusy(false);}
+  };
   const confirmBan=async e=>{
     e.preventDefault(); setBusy(true); setError('');
     try{ const r=await api.put(`/admin/users/${banning.id}/ban`,{reason:banReason}); setNotice(r.data.message||'Account banned.'); closeAll(); load(); }
@@ -164,9 +184,10 @@ export default function Users(){
   // Permission checks come first: the Super Admin decides who can do what.
   const canEdit=x=>can('users','edit')&&x.role?.name!=='Student';
   const canBan=x=>can('users','ban')&&x.role?.name!=='Administrator'&&x.account_status!=='Banned';
-  const canVerify=x=>can('users','verify')&&x.account_status==='Pending';
+  const canVerify=x=>can('users','verify')&&x.role?.name==='Student'&&x.account_status==='Pending'&&!x.verified_at&&x.id_submitted_at&&x.id_front_path&&x.id_back_path&&!x.id_rejection_reason;
   const canUnban=x=>can('users','ban')&&x.account_status==='Banned';
   const canDelete=x=>can('users','delete');
+  const canManagePermissions=x=>onManagePermissions&&!x.is_super_admin;
 
   /* ---- Search & role filter (combined with the status tabs) ---- */
 
@@ -188,23 +209,25 @@ export default function Users(){
   const clearSearchFilters=()=>{setSearch('');setRoleFilter('All');};
 
   return <>
-    <div className="page-heading"><div><h1>User Management</h1><p>Manage staff accounts, verify student registrations, and moderate access.</p></div>{can('users','create')&&<button className="btn btn-primary" onClick={()=>{setForm(emptyForm);setShowPassword(false);setAdding(true)}}><UserPlus size={16}/> Add User</button>}</div>
+    {!embedded&&<div className="page-heading"><div><h1>{isStudentPage?'Student Management':'Staff Management'}</h1><p>{isStudentPage?'Review student ID submissions, verify accounts, and manage student access.':'Manage Administrator, Staff, and Faculty accounts.'}</p></div></div>}
     {notice&&<div className="alert success">{notice}</div>}
-    {error&&!detail&&!editing&&!adding&&!banning&&<div className="alert error">{error}</div>}
+    {loadError&&<div className="alert error" role="alert">{loadError} <button className="btn btn-secondary small" disabled={loading} onClick={()=>{setLoading(true);load();}}>Try Again</button></div>}
+    {error&&!detail&&!editing&&!adding&&!banning&&!rejecting&&<div className="alert error">{error}</div>}
 
     {/* ---- Search & role filter ---- */}
     <div className="toolbar">
       <SearchBar value={search} onChange={setSearch} placeholder="Search by name, email, or username..." />
-      <select value={roleFilter} onChange={e=>setRoleFilter(e.target.value)} aria-label="Filter by role">
+      {!isStudentPage&&<select value={roleFilter} onChange={e=>setRoleFilter(e.target.value)} aria-label="Filter by role">
         <option value="All">All Roles</option>
         {roles.map(r=><option key={r} value={r}>{r}</option>)}
-      </select>
+      </select>}
       {hasSearchFilters&&<button className="btn btn-secondary small" onClick={clearSearchFilters}>Clear</button>}
+      {!isStudentPage&&can('users','create')&&<button className="btn btn-primary" onClick={()=>{setError('');setForm(emptyForm);setShowPassword(false);setAdding(true)}}><UserPlus size={16}/> Add Staff Account</button>}
     </div>
 
     {/* ---- Status filter tabs ---- */}
     <div className="filter-tabs" role="tablist">
-      {STATUS_FILTERS.map(s=>
+      {STATUS_FILTERS.filter(s=>isStudentPage||s!=='Pending').map(s=>
         <button key={s} className={`filter-tab ${statusFilter===s?'active':''}`} onClick={()=>setStatusFilter(s)}>
           {s}{s!=='All'&&` (${s==='Pending'?countBy('Pending'):s==='Active'?countBy('Active'):countBy('Banned')})`}
         </button>
@@ -212,17 +235,19 @@ export default function Users(){
     </div>
 
     <div className="panel table-wrap"><table>
-      <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
+      <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>{isStudentPage?'Student ID':'Role'}</th><th>Status</th><th>Action</th></tr></thead>
       <tbody>{filtered.map(x=><tr key={x.id}>
         <td>{[x.first_name,x.middle_name].filter(Boolean).join(' ')} {x.last_name}</td>
         <td>{x.username}</td>
         <td>{x.email}</td>
-        <td>{x.role?.name}</td>
-        <td><StatusBadge status={x.account_status}/>{x.ban_reason?<span title={`Reason: ${x.ban_reason}`} className="ban-reason-hint"><Ban size={12}/></span>:null}</td>
+        <td>{isStudentPage?(x.id_number||'—'):x.role?.name}</td>
+        <td><StatusBadge status={x.account_status}/>{x.id_rejection_reason&&<span title={`ID verification rejected: ${x.id_rejection_reason}`}><StatusBadge status="Rejected"/></span>}{x.ban_reason?<span title={`Reason: ${x.ban_reason}`} className="ban-reason-hint"><Ban size={12}/></span>:null}</td>
         <td className="action-cell">
           <button className="btn btn-secondary small" title="View info" onClick={()=>openDetail(x.id)}><Eye size={15}/></button>
           {canVerify(x)&&<button className="btn btn-primary small" title="Verify account" disabled={busy} onClick={()=>verify(x)}><CheckCircle2 size={15}/></button>}
+          {canVerify(x)&&<button className="btn btn-danger small" title="Reject ID verification" aria-label={`Reject ID verification for ${x.first_name} ${x.last_name}`} disabled={busy} onClick={()=>openReject(x)}><XCircle size={15}/></button>}
           {canEdit(x)&&<button className="btn btn-secondary small" title="Edit" onClick={()=>openEdit(x)}><Pencil size={15}/></button>}
+          {!isStudentPage&&canManagePermissions(x)&&<button className="btn btn-secondary small" title="Manage permissions" aria-label={`Manage permissions for ${x.first_name} ${x.last_name}`} onClick={()=>onManagePermissions(x.id)}><ShieldCheck size={15}/></button>}
           {canBan(x)&&<button className="btn btn-danger small" title="Ban account" onClick={()=>openBan(x)}><ShieldBan size={15}/></button>}
           {canUnban(x)&&<button className="btn btn-secondary small" title="Lift ban" disabled={busy} onClick={()=>unban(x)}><RotateCcw size={15}/></button>}
           {canDelete(x)&&x.role?.name!=='Administrator'&&<button className="btn btn-danger small" title="Delete" onClick={()=>del(x)}><Trash2 size={15}/></button>}
@@ -230,33 +255,35 @@ export default function Users(){
       </tr>)}</tbody>
     </table></div>
     {loading&&!error&&<div className="panel"><Skeleton rows={5} /></div>}
-    {!loading&&!filtered.length&&!error&&(hasSearchFilters
+    {!loading&&!filtered.length&&!error&&!loadError&&(hasSearchFilters
       ?<EmptyState icon={UsersRound} title="No matching users" message="No users match your search or role filter. Try different keywords or clear the filters." action={{label:'Clear Filters',onClick:clearSearchFilters}}/>
-      :<EmptyState icon={UsersRound} title={statusFilter==='All'?'No users found':`No ${statusFilter.toLowerCase()} users`} message={statusFilter==='Pending'?'Student registrations awaiting verification will appear here.':'Registered accounts will appear here.'} action={statusFilter==='All'?{label:'Add User',onClick:()=>{setForm(emptyForm);setShowPassword(false);setAdding(true)}}:null}/>)}
+      :<EmptyState icon={UsersRound} title={`No ${statusFilter==='All'?'':`${statusFilter.toLowerCase()} `}${isStudentPage?'students':'staff accounts'} found`} message={isStudentPage?'Students who register in the mobile app will appear here.':'Administrator, Staff, and Faculty accounts will appear here.'} action={!isStudentPage&&statusFilter==='All'&&can('users','create')?{label:'Add Staff Account',onClick:()=>{setForm(emptyForm);setShowPassword(false);setAdding(true)}}:null}/>)}
 
     {/* ---- View user info ---- */}
     <Modal open={!!detail} title={`User — ${detail?.user?.first_name} ${detail?.user?.last_name}`} onClose={closeAll}>
       {detail&&<>
         <div className="modal-body">
+          {error&&<div className="alert error" role="alert">{error}</div>}
           <div className="detail-list">
             <div><b>Role</b>{detail.user.role?.name}</div>
             <div><b>Status</b><StatusBadge status={detail.user.account_status}/></div>
             {/* Verification is shown independently of ban status — banning
                 never revokes it and unbanning never grants it. */}
-            <div><b>ID Verified</b>{detail.user.is_id_verified ? 'Yes' : 'No'}</div>
+            {isStudentPage&&<div><b>ID Verified</b>{detail.user.is_id_verified ? 'Yes' : 'No'}</div>}
+            {isStudentPage&&detail.user.id_rejection_reason&&<div><b>Verification Rejection Reason</b>{detail.user.id_rejection_reason}</div>}
             <div><b>Username</b>{detail.user.username}</div>
             <div><b>Email</b>{detail.user.email}</div>
             <div><b>Contact Number</b>{detail.user.contact_number||'—'}</div>
             <div><b>Registered</b>{fmtDate(detail.user.created_at)}</div>
-            {detail.user.verified_at&&<div><b>Verified At</b>{fmtDateTime(detail.user.verified_at)}</div>}
-            {detail.user.id_submitted_at&&<div><b>ID Submitted</b>{fmtDateTime(detail.user.id_submitted_at)}</div>}
+            {isStudentPage&&detail.user.verified_at&&<div><b>Verified At</b>{fmtDateTime(detail.user.verified_at)}</div>}
+            {isStudentPage&&detail.user.id_submitted_at&&<div><b>ID Submitted</b>{fmtDateTime(detail.user.id_submitted_at)}</div>}
             {detail.user.banned_at&&<div><b>Banned</b>{fmtDateTime(detail.user.banned_at)}</div>}
             {detail.user.ban_reason&&<div><b>Ban Reason</b>{detail.user.ban_reason}</div>}
           </div>
 
           {/* Submitted verification ID photos (front + back), streamed from
               private storage through the authorized admin endpoint. */}
-          <h3>Verification ID</h3>
+          {isStudentPage&&<><h3>Verification ID</h3>
           {detail.user.id_submitted_at
             ? <div className="id-photo-grid">
                 <IdPhoto userId={detail.user.id} side="front" />
@@ -282,16 +309,34 @@ export default function Users(){
               <td>{b.status}</td>
             </tr>)}</tbody>
           </table></div>
-          {!detail.borrowings.length&&<div className="empty">No borrowing history.</div>}
+          {!detail.borrowings.length&&<div className="empty">No borrowing history.</div>}</>}
         </div>
         <div className="modal-actions">
           {canVerify(detail.user)&&<button className="btn btn-primary" disabled={busy} onClick={()=>verify(detail.user)}><CheckCircle2 size={16}/> Verify Account</button>}
+          {canVerify(detail.user)&&<button className="btn btn-danger" disabled={busy} onClick={()=>openReject(detail.user)}><XCircle size={16}/> Reject Verification</button>}
           {canBan(detail.user)&&<button className="btn btn-danger" onClick={()=>openBan(detail.user)}><ShieldBan size={16}/> Ban Account</button>}
           {canUnban(detail.user)&&<button className="btn btn-secondary" disabled={busy} onClick={()=>unban(detail.user)}><RotateCcw size={16}/> Lift Ban</button>}
           {canEdit(detail.user)&&<button className="btn btn-secondary" onClick={()=>openEdit(detail.user,true)}>Edit User</button>}
+          {!isStudentPage&&canManagePermissions(detail.user)&&<button className="btn btn-secondary" onClick={()=>onManagePermissions(detail.user.id)}><ShieldCheck size={16}/> Manage Permissions</button>}
           <button className="btn btn-primary" onClick={closeAll}>Close</button>
         </div>
       </>}
+    </Modal>
+
+    <Modal open={!!rejecting} title="Reject ID verification?" onClose={closeAll} busy={busy} tone="danger" icon={XCircle}>
+      {rejecting&&<form onSubmit={confirmReject}>
+        <div className="modal-body">
+          <p>Reject {rejecting.first_name} {rejecting.last_name}'s ID verification? The student will receive a notification in the mobile app with your reason and can submit new ID photos.</p>
+          <label>Rejection reason (shown to the student)
+            <textarea value={rejectionReason} onChange={e=>setRejectionReason(e.target.value)} placeholder="e.g. The back of the ID is blurry. Please upload a clearer photo." required maxLength={500} disabled={busy}/>
+          </label>
+          {error&&<div className="alert error" role="alert">{error}</div>}
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn btn-secondary" onClick={closeAll} disabled={busy}>Cancel</button>
+          <button className="btn btn-danger" disabled={busy||!rejectionReason.trim()}><XCircle size={16}/>{busy?'Rejecting...':'Reject and Notify Student'}</button>
+        </div>
+      </form>}
     </Modal>
 
     {/* ---- Ban user (requires reason) ---- */}
@@ -312,7 +357,7 @@ export default function Users(){
     </Modal>
 
     {/* ---- Add / Edit user (Admin, Faculty, Staff only) ---- */}
-    <Modal open={adding||!!editing} title={editing?`Edit — ${editing.first_name} ${editing.last_name}`:'Add User'} onClose={closeAll}>
+    <Modal open={adding||!!editing} title={editing?`Edit — ${editing.first_name} ${editing.last_name}`:'Add Staff Account'} onClose={closeAll}>
       <form onSubmit={save}>
         <div className="modal-body">
           {!editing&&<p className="ban-warning">Students are not created here — they register themselves in the mobile app and appear as Pending for you to verify.</p>}

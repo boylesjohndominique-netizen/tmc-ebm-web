@@ -17,7 +17,7 @@ import useRealtimeResource from '../../hooks/useRealtimeResource';
  * actions the role has by default vs. overrides, and "view" is enforced as
  * the minimum action per module by both UI and API.
  */
-export default function Permissions() {
+export default function Permissions({ userId, onSelectUser }) {
   const { refreshUser } = useAuth();
   const confirm = useConfirm();
   const [catalog, setCatalog] = useState([]); // [{key,label,description,actions}]
@@ -25,6 +25,8 @@ export default function Permissions() {
   const [selected, setSelected] = useState(null); // user object from index
   const [overrides, setOverrides] = useState({}); // {module: [actions]}
   const [loading, setLoading] = useState(true);
+  const [editorLoading, setEditorLoading] = useState(false);
+  const [editorAttempt, setEditorAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -40,20 +42,23 @@ export default function Permissions() {
   // Other super admins' edits to accounts/permissions show up instantly.
   useRealtimeResource(['users'], load);
 
-  const openUser = async u => {
-    setError(''); setNotice('');
-    try {
-      const { data } = await api.get(`/admin/permissions/${u.id}`);
-      setSelected(data);
-      setOverrides(Object.fromEntries(
-        Object.entries(data.permission_map).map(([m, a]) => [m, [...a]])
-      ));
-    } catch {
-      setError('Unable to load this user\'s permissions.');
-    }
-  };
-
-  const closeUser = () => { setSelected(null); setOverrides({}); setError(''); setNotice(''); };
+  useEffect(() => {
+    let active = true;
+    setSelected(null); setOverrides({}); setError(''); setNotice('');
+    setEditorLoading(!!userId);
+    if (!userId) return;
+    api.get(`/admin/permissions/${encodeURIComponent(userId)}`)
+      .then(({ data }) => {
+        if (!active) return;
+        setSelected(data);
+        setOverrides(Object.fromEntries(
+          Object.entries(data.permission_map).map(([m, a]) => [m, [...a]])
+        ));
+      })
+      .catch(() => { if (active) setError('Unable to load this account\'s permissions. Select the account again to retry.'); })
+      .finally(() => { if (active) setEditorLoading(false); });
+    return () => { active = false; };
+  }, [userId, editorAttempt]);
 
   const toggle = (module, action) => {
     setOverrides(prev => {
@@ -137,12 +142,7 @@ export default function Permissions() {
 
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <h1><ShieldCheck size={24} className="heading-icon" /> User Permissions</h1>
-          <p>Control which modules and actions each Admin, Staff, or Faculty account can use.</p>
-        </div>
-      </div>
+      <p className="small-note">Control which modules and actions each Administrator, Staff, or Faculty account can use. Super Admin accounts are protected.</p>
 
       {notice && <div className="alert success">{notice}</div>}
       {error && !selected && <div className="alert error">{error}</div>}
@@ -159,7 +159,9 @@ export default function Permissions() {
               <button
                 key={u.id}
                 className={`permissions-user ${selected?.id === u.id ? 'active' : ''}`}
-                onClick={() => openUser(u)}
+                aria-pressed={selected?.id === u.id}
+                disabled={busy}
+                onClick={() => String(u.id) === userId ? setEditorAttempt(n => n + 1) : onSelectUser(u.id)}
               >
                 <span className="permissions-user-name">
                   {[u.first_name, u.last_name].filter(Boolean).join(' ')}
@@ -180,8 +182,8 @@ export default function Permissions() {
         </div>
 
         {/* ---------- Editor ---------- */}
-        <div className="panel permissions-editor">
-          {!selected ? (
+        <div className="panel permissions-editor" aria-busy={editorLoading}>
+          {editorLoading ? <Skeleton rows={6} /> : !selected ? (
             <EmptyState
               icon={ShieldCheck}
               title="Select an account"

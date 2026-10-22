@@ -20,13 +20,13 @@ import NoAccess from "./components/NoAccess";
 const Login = lazy(() => import("./pages/auth/Login"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const Users = lazy(() => import("./pages/admin/Users"));
+const StaffManagement = lazy(() => import("./pages/admin/StaffManagement"));
 const AdminEquipment = lazy(() => import("./pages/admin/Equipment"));
 const BorrowingRequests = lazy(() => import("./pages/admin/BorrowingRequests"));
 const ReturnRequests = lazy(() => import("./pages/admin/ReturnRequests"));
 const AdminNotifications = lazy(() => import("./pages/admin/Notifications"));
 const AdminProfile = lazy(() => import("./pages/admin/Profile"));
 const Reports = lazy(() => import("./pages/admin/Reports"));
-const Permissions = lazy(() => import("./pages/admin/Permissions"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 
 function PageFallback() {
@@ -191,9 +191,21 @@ export default function App() {
           {/* Users Management */}
           <Route
             path="/admin/users"
+            element={<Navigate to="/admin/students" replace />}
+          />
+          <Route
+            path="/admin/students"
             element={
               <RequirePerm module="users">
-                <Users />
+                <Users key="students" audience="students" />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/admin/staff"
+            element={
+              <RequirePerm module="users">
+                <StaffManagement />
               </RequirePerm>
             }
           />
@@ -256,9 +268,7 @@ export default function App() {
           <Route
             path="/admin/permissions"
             element={
-              <RequirePerm module="permissions" action="manage">
-                <Permissions />
-              </RequirePerm>
+              <Navigate to="/admin/staff?tab=permissions" replace />
             }
           />
 
