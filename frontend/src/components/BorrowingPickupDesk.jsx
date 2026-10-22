@@ -111,6 +111,7 @@ export default function BorrowingPickupDesk({ onProcessed, isReturn = false }) {
       <ul>{receipt.items?.map(item => <li key={item.equipment_id}>
         <b>{item.name} × {item.quantity}</b> · Equipment #{item.equipment_id} · {item.category} · {item.condition}
         {item.description && <p>{item.description}</p>}
+        {item.pickup_location && <p><b>School pickup location:</b> {item.pickup_location}</p>}
       </li>)}</ul>
       <p><b>Purpose / student notes:</b> {receipt.borrower_remarks || '—'}</p>
       <p><b>Approved by:</b> {receipt.approved_by} · {fmtDateTime(receipt.approved_at)}</p>

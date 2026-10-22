@@ -53,6 +53,9 @@ class BorrowingManagementController extends Controller
                     if (! $equipment || $equipment->available_quantity < $item->quantity) {
                         abort(409, "Insufficient stock for {$item->equipment?->name}. The request cannot be approved.");
                     }
+                    abort_unless($equipment->allowsBorrowingPeriod(
+                        $borrowing->borrowing_date->toDateString(), $borrowing->expected_return_date->toDateString()),
+                        422, "The loan duration is outside the current minimum and maximum borrowing days for {$equipment->name}.");
                     $item->setRelation('equipment', $equipment->load('category'));
                 }
 
@@ -86,6 +89,7 @@ class BorrowingManagementController extends Controller
                             'description' => $item->equipment?->description,
                             'category' => $item->equipment?->category?->name,
                             'condition' => $item->equipment?->condition,
+                            'pickup_location' => $item->equipment?->pickup_location,
                             'quantity' => $item->quantity,
                         ])->all(),
                     ],

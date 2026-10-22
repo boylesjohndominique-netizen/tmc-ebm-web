@@ -9,6 +9,7 @@ use App\Models\ReturnRequest;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -67,6 +68,10 @@ class MobileController extends Controller
         ]);
 
         $equipment = Equipment::findOrFail($data['equipment_id']);
+        abort_unless($equipment->allowsBorrowingPeriod(
+            Carbon::parse($data['borrowing_date'])->toDateString(),
+            Carbon::parse($data['expected_return_date'])->toDateString()),
+            422, 'The loan duration must be within the equipment minimum and maximum borrowing days.');
 
         // Guard: only admin-verified (Active) accounts may borrow.
         if ($request->user()->isPending()) {

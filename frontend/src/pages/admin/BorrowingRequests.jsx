@@ -126,6 +126,8 @@ export default function BorrowingRequests(){
               return <li key={i.id}>
                 {i.equipment?.name} — requested <b>{i.quantity}</b>, available <b style={{color:enough?'var(--success)':'var(--danger)'}}>{i.equipment?.available_quantity??'?'}</b>
                 {!enough&&<span className="stock-warning"> — insufficient stock for approval</span>}
+                <p><b>School pickup location:</b> {i.equipment?.pickup_location || 'Not set'}</p>
+                {i.equipment?.min_borrowing_days != null && <p><b>Allowed loan duration:</b> {i.equipment.min_borrowing_days}–{i.equipment.max_borrowing_days} days</p>}
               </li>;
             })}
           </ul>

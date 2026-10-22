@@ -3,27 +3,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SaveEquipmentRequest;
 use App\Models\BorrowingItem;
 use App\Models\Equipment;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class EquipmentManagementController extends Controller
 {
-    public function store(Request $request)
+    public function store(SaveEquipmentRequest $request)
     {
-        $data = $request->validate([
-            'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:150',
-            'description' => 'nullable|string',
-            'quantity' => 'required|integer|min:0',
-            'condition' => 'required|string|max:50',
-            'image' => 'nullable|image|max:5120',
-            'gallery' => 'nullable|array|max:10',
-            'gallery.*' => 'image|max:5120',
-        ]);
-
-        unset($data['gallery']);
+        $data = $request->validated();
+        unset($data['gallery'], $data['remove_image'], $data['existing_images'], $data['clear_gallery']);
 
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('equipment-images', 'local');
@@ -61,22 +51,9 @@ class EquipmentManagementController extends Controller
         ]);
     }
 
-    public function update(Request $request, Equipment $equipment)
+    public function update(SaveEquipmentRequest $request, Equipment $equipment)
     {
-        $data = $request->validate([
-            'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:150',
-            'description' => 'nullable|string',
-            'quantity' => 'required|integer|min:0',
-            'condition' => 'required|string|max:50',
-            'image' => 'nullable|image|max:5120',
-            'remove_image' => 'nullable|boolean',
-            'existing_images' => 'nullable|array',
-            'existing_images.*' => 'string',
-            'clear_gallery' => 'nullable|boolean',
-            'gallery' => 'nullable|array|max:10',
-            'gallery.*' => 'image|max:5120',
-        ]);
+        $data = $request->validated();
 
         unset($data['remove_image'], $data['existing_images'], $data['clear_gallery'], $data['gallery']);
 

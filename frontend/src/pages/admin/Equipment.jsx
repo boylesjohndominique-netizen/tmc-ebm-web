@@ -8,7 +8,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
 import useRealtimeResource from '../../hooks/useRealtimeResource';
 
-const emptyForm = { category_id: '', name: '', description: '', quantity: 1, condition: 'Good' };
+const emptyForm = { category_id: '', name: '', description: '', quantity: 1, condition: 'Good', pickup_location: '', min_borrowing_days: '', max_borrowing_days: '' };
 const MAX_GALLERY = 10;
 
 export default function Equipment() {
@@ -49,7 +49,7 @@ export default function Equipment() {
   /* ---- Search & filters ---- */
   const query = useDebouncedValue(search.trim(), 300).toLowerCase();
   const filtered = items.filter(x =>
-    (!query || x.name.toLowerCase().includes(query) || (x.description || '').toLowerCase().includes(query) || (x.category?.name || '').toLowerCase().includes(query)) &&
+    (!query || x.name.toLowerCase().includes(query) || (x.description || '').toLowerCase().includes(query) || (x.pickup_location || '').toLowerCase().includes(query) || (x.category?.name || '').toLowerCase().includes(query)) &&
     (catFilter === 'All' || String(x.category_id) === catFilter) &&
     (condFilter === 'All' || x.condition === condFilter) &&
     (statusFilter === 'All' || x.status === statusFilter)
@@ -87,6 +87,9 @@ export default function Equipment() {
       description: x.description || '',
       quantity: x.quantity,
       condition: x.condition,
+      pickup_location: x.pickup_location || '',
+      min_borrowing_days: x.min_borrowing_days ?? '',
+      max_borrowing_days: x.max_borrowing_days ?? '',
     });
     setMainImagePreview(x.image ? equipmentImageUrl(x.image) : null);
     setExistingImages(Array.isArray(x.images) ? x.images : []);
@@ -157,6 +160,9 @@ export default function Equipment() {
       fd.append('description', form.description || '');
       fd.append('quantity', String(Number(form.quantity)));
       fd.append('condition', form.condition);
+      fd.append('pickup_location', form.pickup_location.trim());
+      fd.append('min_borrowing_days', form.min_borrowing_days);
+      fd.append('max_borrowing_days', form.max_borrowing_days);
 
       if (mainImageFile) {
         fd.append('image', mainImageFile);
@@ -289,6 +295,11 @@ export default function Equipment() {
                     </button>
                     <div>
                       <div className="equip-row-name">{x.name}</div>
+                      <div className="equip-row-sub muted">Pickup: {x.pickup_location || 'Not set'}</div>
+                      <div className="equip-row-sub muted">
+                        Loan duration: {x.min_borrowing_days != null && x.max_borrowing_days != null
+                          ? `${x.min_borrowing_days}–${x.max_borrowing_days} days` : 'No duration restriction'}
+                      </div>
                       {x.description && (
                         <div className="equip-row-sub muted">{x.description}</div>
                       )}
@@ -400,6 +411,18 @@ export default function Equipment() {
           <label>Description
             <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Describe specifications, included accessories, or usage notes..." />
           </label>
+          <label>School pickup location
+            <input name="pickup_location" value={form.pickup_location} onChange={e => setForm({ ...form, pickup_location: e.target.value })} maxLength={255} required={editing === 'new'} placeholder="e.g. AV Office, Building A, Room 102" />
+          </label>
+          <div className="form-grid">
+            <label>Minimum borrowing days
+              <input name="min_borrowing_days" type="number" min="1" max={form.max_borrowing_days || 3650} step="1" value={form.min_borrowing_days} onChange={e => setForm({ ...form, min_borrowing_days: e.target.value })} required={form.max_borrowing_days !== ''} placeholder="e.g. 10" />
+            </label>
+            <label>Maximum borrowing days
+              <input name="max_borrowing_days" type="number" min={form.min_borrowing_days || 1} max="3650" step="1" value={form.max_borrowing_days} onChange={e => setForm({ ...form, max_borrowing_days: e.target.value })} required={form.min_borrowing_days !== ''} placeholder="e.g. 15" />
+            </label>
+          </div>
+          <p className="muted">For 10–15 days, students must choose a return date 10 to 15 days after their borrowing date. Leave both fields empty for no duration restriction.</p>
 
           {/* Additional Description / Gallery Pictures Uploader */}
           <div className="equip-media-section">
