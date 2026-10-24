@@ -15,6 +15,7 @@ import {
 
 import { useAuth } from "../../context/AuthContext";
 import ThemeToggle from "../../components/ThemeToggle";
+import api from "../../services/api";
 
 export default function Login() {
   // Forgot password mode
@@ -114,29 +115,9 @@ export default function Login() {
     setBusy(true);
 
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/forgot-password",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-
-          body: JSON.stringify({
-            email: forgotEmail.trim(),
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Unable to send password reset link."
-        );
-      }
+      const { data } = await api.post('/forgot-password', {
+        email: forgotEmail.trim(),
+      });
 
       setMessage(
         data.message ||
@@ -147,7 +128,8 @@ export default function Login() {
 
     } catch (err) {
       setError(
-        err.message ||
+        err.response?.data?.message ||
+          err.message ||
           "Unable to send password reset link. Please try again."
       );
 
