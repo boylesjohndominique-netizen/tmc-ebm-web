@@ -100,12 +100,12 @@ class DashboardController extends Controller
 
         // ---- Users per role ----
         $usersByRole = User::query()
-            ->with('role:id,name')
+            ->leftJoin('roles', 'users.role_id', '=', 'roles.id')
+            ->selectRaw("COALESCE(roles.name, 'Unassigned') as name, COUNT(users.id) as value")
+            ->groupBy('name')
+            ->orderByDesc('value')
             ->get()
-            ->groupBy(fn ($u) => $u->role?->name ?? 'Unassigned')
-            ->map(fn ($group) => $group->count())
-            ->sortDesc()
-            ->map(fn ($count, $role) => ['name' => $role, 'value' => $count])
+            ->map(fn ($row) => ['name' => (string) $row->name, 'value' => (int) $row->value])
             ->values();
 
         // ---- Headline metrics ----
