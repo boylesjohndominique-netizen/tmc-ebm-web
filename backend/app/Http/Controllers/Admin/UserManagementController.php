@@ -27,14 +27,22 @@ class UserManagementController extends Controller
     /** Roles the super admin may assign to accounts it creates. */
     public const CREATABLE_ROLES = ['Administrator', 'Faculty', 'Staff'];
 
-    public function index()
+    public function index(Request $request)
     {
+        $query = User::with('role')
+            ->orderBy('last_name')
+            ->orderBy('first_name');
+
+        if ($request->filled('audience')) {
+            if ($request->audience === 'students') {
+                $query->whereHas('role', fn ($q) => $q->where('name', 'Student'));
+            } elseif ($request->audience === 'staff') {
+                $query->whereHas('role', fn ($q) => $q->whereIn('name', ['Administrator', 'Staff', 'Faculty']));
+            }
+        }
+
         return response()->json(
-            User::with('role')
-                ->orderBy('last_name')
-                ->orderBy('first_name')
-                ->get()
-                ->makeHidden(['password', 'remember_token'])
+            $query->get()->makeHidden(['password', 'remember_token'])
         );
     }
 

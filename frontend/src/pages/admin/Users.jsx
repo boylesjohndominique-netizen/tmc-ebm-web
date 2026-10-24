@@ -1,4 +1,4 @@
-import { useCallback,useEffect,useState} from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Ban, CheckCircle2, Eye, EyeOff, IdCard, Pencil, RotateCcw, ShieldBan, ShieldCheck, Trash2, UserPlus, UsersRound, XCircle } from 'lucide-react';
 import api from '../../services/api';
@@ -78,10 +78,15 @@ export default function Users({audience='students',embedded=false,onManagePermis
 
   const [loading,setLoading]=useState(true);
   const [loadError,setLoadError]=useState('');
-  const load=useCallback(()=>api.get('/admin/users')
-    .then(r=>{setItems(r.data.filter(x=>isStudentPage?x.role?.name==='Student':['Administrator','Staff','Faculty'].includes(x.role?.name)));setLoadError('');})
-    .catch(()=>setLoadError(`Unable to load ${isStudentPage?'student':'staff'} accounts.`))
-    .finally(()=>setLoading(false)),[isStudentPage]);
+  const load = useCallback(() => api.get('/admin/users', {
+    params: { audience: isStudentPage ? 'students' : 'staff' }
+  })
+    .then(r => {
+      setItems(r.data);
+      setLoadError('');
+    })
+    .catch(() => setLoadError(`Unable to load ${isStudentPage ? 'student' : 'staff'} accounts.`))
+    .finally(() => setLoading(false)), [isStudentPage]);
   useEffect(()=>{load()},[load]);
 
   // Live roster: new registrations, verifications and bans pushed by staff
@@ -192,19 +197,29 @@ export default function Users({audience='students',embedded=false,onManagePermis
   /* ---- Search & role filter (combined with the status tabs) ---- */
 
   // Roles present in the system, derived from the loaded users (sorted A→Z).
-  const roles=[...new Set(items.map(x=>x.role?.name).filter(Boolean))].sort();
+  const roles = useMemo(() => [...new Set(items.map(x => x.role?.name).filter(Boolean))].sort(), [items]);
 
-  const matchesSearch=x=>!query
-    ||[x.first_name,x.middle_name,x.last_name].filter(Boolean).join(' ').toLowerCase().includes(query)
-    ||(x.email||'').toLowerCase().includes(query)
-    ||(x.username||'').toLowerCase().includes(query);
+  const filtered = useMemo(() => {
+    return items.filter(x => {
+      const statusMatch = statusFilter === 'All' || x.account_status === statusFilter;
+      const roleMatch = roleFilter === 'All' || x.role?.name === roleFilter;
+      if (!statusMatch || !roleMatch) return false;
+      if (!query) return true;
+      const fullName = [x.first_name, x.middle_name, x.last_name].filter(Boolean).join(' ').toLowerCase();
+      return fullName.includes(query) || (x.email || '').toLowerCase().includes(query) || (x.username || '').toLowerCase().includes(query);
+    });
+  }, [items, statusFilter, roleFilter, query]);
 
-  const filtered=items.filter(x=>
-    (statusFilter==='All'||x.account_status===statusFilter)&&
-    (roleFilter==='All'||x.role?.name===roleFilter)&&
-    matchesSearch(x)
-  );
-  const countBy=s=>items.filter(x=>x.account_status===s).length;
+  const counts = useMemo(() => {
+    const map = { All: items.length, Pending: 0, Active: 0, Banned: 0 };
+    for (const item of items) {
+      if (item.account_status in map) {
+        map[item.account_status]++;
+      }
+    }
+    return map;
+  }, [items]);
+  const countBy = s => counts[s] ?? 0;
   const hasSearchFilters=query!==''||roleFilter!=='All';
   const clearSearchFilters=()=>{setSearch('');setRoleFilter('All');};
 
