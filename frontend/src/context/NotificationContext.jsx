@@ -1,6 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import api from '../services/api';
-import { getToken } from '../services/api';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import api, { getToken } from '../services/api';
 import { onResource } from '../services/realtime';
 
 const NotificationContext = createContext(null);
@@ -19,6 +18,8 @@ export function NotificationProvider({ children }) {
       // ignore transient errors
     }
   }, []);
+
+  const markAllReadLocally = useCallback(() => setUnread(0), []);
 
   useEffect(() => {
     token.current = getToken();
@@ -50,10 +51,15 @@ export function NotificationProvider({ children }) {
     };
   }, [fetchCount]);
 
+  const value = useMemo(() => ({
+    unread,
+    refresh: fetchCount,
+    markAllReadLocally,
+    lastEventId,
+  }), [unread, fetchCount, markAllReadLocally, lastEventId]);
+
   return (
-    <NotificationContext.Provider
-      value={{ unread, refresh: fetchCount, markAllReadLocally: () => setUnread(0), lastEventId }}
-    >
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );

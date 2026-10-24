@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Inbox, CheckCircle2, XCircle, PackageCheck } from 'lucide-react';
 import api from '../../services/api';
 import StatusBadge from '../../components/StatusBadge';
@@ -44,15 +44,19 @@ export default function ReturnRequests() {
 
   /* ---- Search & filters ---- */
   const query = useDebouncedValue(search.trim(), 300).toLowerCase();
-  const filtered = items.filter(x => {
-    const fullName = [x.user?.first_name, x.user?.middle_name, x.user?.last_name].filter(Boolean).join(' ').toLowerCase();
-    const textMatch = !query || fullName.includes(query) || `#${x.id}`.includes(query) || `#${x.borrowing_request_id}`.includes(query) || x.transaction_code?.includes(query);
-    const statusMatch = statusFilter === 'All' || x.status === statusFilter;
-    return textMatch && statusMatch;
-  });
+  const filtered = useMemo(() => {
+    return items.filter(x => {
+      const statusMatch = statusFilter === 'All' || x.status === statusFilter;
+      if (!statusMatch) return false;
+      if (!query) return true;
+      const fullName = [x.user?.first_name, x.user?.middle_name, x.user?.last_name].filter(Boolean).join(' ').toLowerCase();
+      return fullName.includes(query) || `#${x.id}`.includes(query) || `#${x.borrowing_request_id}`.includes(query) || (x.transaction_code && x.transaction_code.includes(query));
+    });
+  }, [items, query, statusFilter]);
+
   const hasFilters = query !== '' || statusFilter !== 'All';
   const clearFilters = () => { setSearch(''); setStatusFilter('All'); };
-  const statuses = [...new Set(items.map(x => x.status))]; // statuses actually present
+  const statuses = useMemo(() => [...new Set(items.map(x => x.status))], [items]);
 
   const open = (x, mode) => { setSelected(x); setAction(mode); setRemarks(x.status === 'Awaiting Verification' && mode === 'Rejected' ? x.handover_remarks || '' : ''); setModalError(''); setHandoverStart(''); setHandoverEnd(''); };
   const close = () => { if (!busy) { setSelected(null); setAction(null); setRemarks(''); setModalError(''); } };

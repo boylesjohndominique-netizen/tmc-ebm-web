@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImagePlus, Images, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
 import api, { equipmentImageUrl } from '../../services/api';
 import Modal from '../../components/Modal';
@@ -48,12 +48,14 @@ export default function Equipment() {
 
   /* ---- Search & filters ---- */
   const query = useDebouncedValue(search.trim(), 300).toLowerCase();
-  const filtered = items.filter(x =>
-    (!query || x.name.toLowerCase().includes(query) || (x.description || '').toLowerCase().includes(query) || (x.pickup_location || '').toLowerCase().includes(query) || (x.category?.name || '').toLowerCase().includes(query)) &&
-    (catFilter === 'All' || String(x.category_id) === catFilter) &&
-    (condFilter === 'All' || x.condition === condFilter) &&
-    (statusFilter === 'All' || x.status === statusFilter)
-  );
+  const filtered = useMemo(() => {
+    return items.filter(x =>
+      (!query || x.name.toLowerCase().includes(query) || (x.description || '').toLowerCase().includes(query) || (x.pickup_location || '').toLowerCase().includes(query) || (x.category?.name || '').toLowerCase().includes(query)) &&
+      (catFilter === 'All' || String(x.category_id) === catFilter) &&
+      (condFilter === 'All' || x.condition === condFilter) &&
+      (statusFilter === 'All' || x.status === statusFilter)
+    );
+  }, [items, query, catFilter, condFilter, statusFilter]);
   const hasFilters = query !== '' || catFilter !== 'All' || condFilter !== 'All' || statusFilter !== 'All';
   const clearFilters = () => { setSearch(''); setCatFilter('All'); setCondFilter('All'); setStatusFilter('All'); };
 

@@ -57,19 +57,25 @@ export default function Notifications() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(() => {
+  const loadNotifications = useCallback(() => {
     return api.get('/notifications')
       .then(r => setItems(r.data))
-      .then(() => api.get('/admin/notification-users'))
-      .then(r => setUsers(r.data))
       .catch(() => setError('Unable to load notifications. Please refresh the page.'))
       .finally(() => setLoading(false));
   }, []);
+  const load = loadNotifications;
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    loadNotifications();
+    if (can('notifications', 'send')) {
+      api.get('/admin/notification-users')
+        .then(r => setUsers(r.data))
+        .catch(() => {});
+    }
+  }, [loadNotifications, can]);
 
   // New notifications ping the private user channel; refetch the inbox.
-  useRealtimeResource(['user:notification'], load);
+  useRealtimeResource(['user:notification'], loadNotifications);
 
   /* Optimistic read updates — the row reacts instantly, then the
      unread-count badge syncs via the polling context. */

@@ -1,4 +1,4 @@
-import { useCallback, useEffect,useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Inbox, CheckCircle2, XCircle } from 'lucide-react';
 import api from '../../services/api';
@@ -37,19 +37,31 @@ export default function BorrowingRequests(){
   useRealtimeResource(['borrowings', 'equipment'], load);
 
   /* ---- Search & filters ---- */
-  const query=useDebouncedValue(search.trim(),300).toLowerCase();
-  const filtered=items.filter(x=>{
-    const fullName=[x.user?.first_name,x.user?.middle_name,x.user?.last_name].filter(Boolean).join(' ').toLowerCase();
-    const equipment=x.items.map(i=>i.equipment?.name).join(', ').toLowerCase();
-    const textMatch=!query||fullName.includes(query)||equipment.includes(query)||`#${x.id}`.includes(query)||x.transaction_code?.includes(query);
-    const statusMatch=statusFilter==='All'||x.status===statusFilter;
-    const dateMatch=(!fromDate||x.borrowing_date>=fromDate)&&(!toDate||x.borrowing_date<=toDate);
-    return textMatch&&statusMatch&&dateMatch;
-  });
-  const hasFilters=query!==''||statusFilter!=='All'||fromDate||toDate;
-  const clearFilters=()=>{setSearch('');setStatusFilter('All');setFromDate('');setToDate('');};
-  const statuses=[...new Set(items.map(x=>x.status))]; // statuses actually present
-  const countByStatus=s=>items.filter(x=>x.status===s).length;
+  const query = useDebouncedValue(search.trim(), 300).toLowerCase();
+
+  const filtered = useMemo(() => {
+    return items.filter(x => {
+      const statusMatch = statusFilter === 'All' || x.status === statusFilter;
+      const dateMatch = (!fromDate || x.borrowing_date >= fromDate) && (!toDate || x.borrowing_date <= toDate);
+      if (!statusMatch || !dateMatch) return false;
+      if (!query) return true;
+      const fullName = [x.user?.first_name, x.user?.middle_name, x.user?.last_name].filter(Boolean).join(' ').toLowerCase();
+      const equipment = x.items.map(i => i.equipment?.name).join(', ').toLowerCase();
+      return fullName.includes(query) || equipment.includes(query) || `#${x.id}`.includes(query) || (x.transaction_code && x.transaction_code.includes(query));
+    });
+  }, [items, query, statusFilter, fromDate, toDate]);
+
+  const hasFilters = query !== '' || statusFilter !== 'All' || fromDate || toDate;
+  const clearFilters = () => { setSearch(''); setStatusFilter('All'); setFromDate(''); setToDate(''); };
+  const statuses = useMemo(() => [...new Set(items.map(x => x.status))], [items]);
+  const countsByStatus = useMemo(() => {
+    const map = {};
+    for (const item of items) {
+      map[item.status] = (map[item.status] || 0) + 1;
+    }
+    return map;
+  }, [items]);
+  const countByStatus = s => countsByStatus[s] || 0;
 
   const open=(x,mode)=>{setSelected(x);setAction(mode);setRemarks('');setError('');setPickupStart('');setPickupEnd('')};
   const close=()=>{setSelected(null);setAction(null);setRemarks('');setError('')};

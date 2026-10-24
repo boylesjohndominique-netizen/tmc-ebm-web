@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 const LABELS = {
   pending: 'Pending',
   approved: 'Approved',
@@ -10,12 +12,14 @@ const LABELS = {
   banned: 'Banned',
 };
 
-export default function StatusBadge({ status }) {
+function StatusBadge({ status }) {
   const key = String(status || '').toLowerCase().replace(/\s+/g, '-');
   return (
     <span className={`status-badge ${key}`}>
       <span className="status-dot" aria-hidden="true" />
       {LABELS[key] || status}
-  </span>
+    </span>
   );
 }
+
+export default memo(StatusBadge);

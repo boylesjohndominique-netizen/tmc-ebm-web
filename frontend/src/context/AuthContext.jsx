@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import api, { getToken, setToken, clearToken } from '../services/api';
 import { startRealtime, stopRealtime } from '../services/realtime';
 
@@ -8,7 +8,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     const token = getToken();
     if (!token) { setLoading(false); return; }
     try {
@@ -25,32 +25,32 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { loadUser(); }, []);
+  useEffect(() => { loadUser(); }, [loadUser]);
 
-  const login = async (login, password) => {
-    const { data } = await api.post('/login', { login, password });
+  const login = useCallback(async (loginCredential, password) => {
+    const { data } = await api.post('/login', { login: loginCredential, password });
     setToken(data.token);
     setUser(data.user);
     localStorage.setItem('tmc_user', JSON.stringify(data.user));
     startRealtime();
     return data;
-  };
+  }, []);
 
   // Public self-registration (mobile app flow). The account is created as
   // Pending and requires admin verification, so it does not log the user in.
-  const register = async (form) => {
+  const register = useCallback(async (form) => {
     const { data } = await api.post('/register', form);
     return data;
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try { await api.post('/logout'); } catch {}
     stopRealtime();
     clearToken();
     setUser(null);
-  };
+  }, []);
 
   /**
    * Frontend permission check — mirrors the backend's User::canAccess().
@@ -59,19 +59,30 @@ export function AuthProvider({ children }) {
    * users don't see actions they can't perform; the backend enforces the
    * same rules on every endpoint.
    */
-  const can = (module, action = 'view') => {
+  const can = useCallback((module, action = 'view') => {
     const map = user?.permission_map;
     if (!map) return false;
     if (map['*']?.includes('*')) return true;
     const actions = map[module];
     if (!actions) return false;
     return actions.includes('*') || actions.includes(action);
-  };
+  }, [user?.permission_map]);
 
   const isSuperAdmin = !!user?.is_super_admin;
 
+  const contextValue = useMemo(() => ({
+    user,
+    loading,
+    login,
+    register,
+    logout,
+    refreshUser: loadUser,
+    can,
+    isSuperAdmin,
+  }), [user, loading, login, register, logout, loadUser, can, isSuperAdmin]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser: loadUser, can, isSuperAdmin }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

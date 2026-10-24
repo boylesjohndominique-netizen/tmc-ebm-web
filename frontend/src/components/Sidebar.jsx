@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Boxes, Package, ClipboardList, RotateCcw, Bell, Users, GraduationCap, UserCog, BarChart3, Settings, LogOut, X, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -59,11 +59,13 @@ export default function Sidebar({ open, onClose }) {
   const [openGroup, setOpenGroup] = useState(null);
   const [tip, setTip] = useState(null);
 
-  const nav = adminNav
-    .map(item => item.type === 'group'
-      ? { ...item, children: item.children.filter(c => can(c.module, 'view')) }
-      : item)
-    .filter(item => item.type === 'group' ? item.children.length > 0 : can(item.module, 'view'));
+  const nav = useMemo(() => {
+    return adminNav
+      .map(item => item.type === 'group'
+        ? { ...item, children: item.children.filter(c => can(c.module, 'view')) }
+        : item)
+      .filter(item => item.type === 'group' ? item.children.length > 0 : can(item.module, 'view'));
+  }, [can]);
 
   // Keep the group expanded while the admin is inside one of its pages.
   useEffect(() => {
