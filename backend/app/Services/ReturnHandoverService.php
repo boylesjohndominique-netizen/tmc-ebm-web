@@ -78,8 +78,17 @@ class ReturnHandoverService
                 .' Awaiting final administrator verification; the loan is still open.';
             $recipients = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))
                 ->orWhere('is_super_admin', true)->pluck('id')->push($return->user_id)->unique();
-            foreach ($recipients as $userId) {
-                Notification::create(['user_id' => $userId, 'title' => $title, 'message' => $message, 'type' => 'Return']);
+            $now = now();
+            $notifications = $recipients->map(fn ($userId) => [
+                'user_id' => $userId,
+                'title' => $title,
+                'message' => $message,
+                'type' => 'Return',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->all();
+            if (! empty($notifications)) {
+                Notification::insert($notifications);
             }
 
             return $return;

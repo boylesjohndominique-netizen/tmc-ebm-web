@@ -22,7 +22,7 @@ class ReturnManagementController extends Controller
         $updated = $service->process($returnRequest, $data, $request->user());
         if ($updated->user?->email) {
             try {
-                Mail::to($updated->user->email)->send(new ReturnStatusMail(
+                Mail::to($updated->user->email)->queue(new ReturnStatusMail(
                     userName: trim($updated->user->first_name),
                     status: $data['status'],
                     borrowingRequestId: $updated->borrowing_request_id,

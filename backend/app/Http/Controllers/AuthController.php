@@ -306,7 +306,7 @@ class AuthController extends Controller
             // Send verification email with code and one-click verification link
             try {
                 $verificationUrl = url('/verify-email-link?email='.urlencode($user->email).'&code='.$code);
-                Mail::to($user->email)->send(new VerificationCodeMail(
+                Mail::to($user->email)->queue(new VerificationCodeMail(
                     code: $code,
                     userName: $user->first_name,
                     verificationUrl: $verificationUrl,
@@ -317,16 +317,20 @@ class AuthController extends Controller
         }
 
         // Notify every administrator so someone verifies the new account.
-        $admins = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->get();
+        $adminIds = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->pluck('id');
+        $now = now();
+        $adminNotifications = $adminIds->map(fn ($id) => [
+            'user_id' => $id,
+            'title' => 'New Student Registration',
+            'message' => "{$user->first_name} {$user->last_name} (@{$user->username}) "
+                .'registered as a student and is awaiting verification.',
+            'type' => 'Registration',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->all();
 
-        foreach ($admins as $admin) {
-            Notification::create([
-                'user_id' => $admin->id,
-                'title' => 'New Student Registration',
-                'message' => "{$user->first_name} {$user->last_name} (@{$user->username}) "
-                    .'registered as a student and is awaiting verification.',
-                'type' => 'Registration',
-            ]);
+        if (! empty($adminNotifications)) {
+            Notification::insert($adminNotifications);
         }
 
         if ($preVerified) {
@@ -456,7 +460,7 @@ class AuthController extends Controller
         ]);
 
         try {
-            Mail::to($user->email)->send(new PasswordResetCodeMail(
+            Mail::to($user->email)->queue(new PasswordResetCodeMail(
                 code: $code,
                 userName: $user->first_name,
             ));
@@ -542,7 +546,7 @@ class AuthController extends Controller
 
         try {
             $verificationUrl = url('/verify-email-link?email='.urlencode($user->email).'&code='.$code);
-            Mail::to($user->email)->send(new VerificationCodeMail(
+            Mail::to($user->email)->queue(new VerificationCodeMail(
                 code: $code,
                 userName: $user->first_name,
                 verificationUrl: $verificationUrl,

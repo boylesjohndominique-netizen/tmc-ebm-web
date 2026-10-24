@@ -118,11 +118,11 @@ class BorrowingManagementController extends Controller
             'type' => 'Borrow',
         ]);
 
-        // Send email notification
+        // Send email notification (queued for non-blocking performance)
         if ($updated->user?->email) {
             $equipmentList = $updated->items->map(fn ($i) => $i->equipment?->name.' (×'.$i->quantity.')')->implode(', ');
             try {
-                Mail::to($updated->user->email)->send(new BorrowingStatusMail(
+                Mail::to($updated->user->email)->queue(new BorrowingStatusMail(
                     userName: trim($updated->user->first_name),
                     status: $data['status'],
                     requestId: $updated->id,

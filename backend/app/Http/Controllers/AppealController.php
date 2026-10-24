@@ -38,16 +38,23 @@ class AppealController extends Controller
             // Drop the appeal into every administrator's in-app feed so it
             // surfaces in the admin Notifications page for review.
             $name = trim($user->first_name.' '.$user->last_name);
-
-            User::where('is_super_admin', true)
+            $now = now();
+            $adminIds = User::where('is_super_admin', true)
                 ->orWhereHas('role', fn ($q) => $q->where('name', 'Administrator'))
-                ->get()
-                ->each(fn (User $admin) => Notification::create([
-                    'user_id' => $admin->id,
-                    'title' => 'Ban Appeal — '.($name !== '' ? $name : $user->username),
-                    'message' => 'Reason given by the user: '.$data['message'],
-                    'type' => 'Account',
-                ]));
+                ->pluck('id');
+
+            $records = $adminIds->map(fn ($adminId) => [
+                'user_id' => $adminId,
+                'title' => 'Ban Appeal — '.($name !== '' ? $name : $user->username),
+                'message' => 'Reason given by the user: '.$data['message'],
+                'type' => 'Account',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->all();
+
+            if (! empty($records)) {
+                Notification::insert($records);
+            }
         }
 
         return response()->json([

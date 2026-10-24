@@ -65,13 +65,18 @@ class BorrowingPickupService
             $recipients = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))
                 ->orWhere('is_super_admin', true)->pluck('id')->push($borrowing->user_id)->unique();
 
-            foreach ($recipients as $userId) {
-                Notification::create([
-                    'user_id' => $userId,
-                    'title' => $title,
-                    'message' => $message,
-                    'type' => 'Borrow',
-                ]);
+            $now = now();
+            $notifications = $recipients->map(fn ($userId) => [
+                'user_id' => $userId,
+                'title' => $title,
+                'message' => $message,
+                'type' => 'Borrow',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->all();
+
+            if (! empty($notifications)) {
+                Notification::insert($notifications);
             }
 
             return $borrowing;

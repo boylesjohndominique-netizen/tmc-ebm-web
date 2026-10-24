@@ -111,15 +111,19 @@ class MobileController extends Controller
         // Tell the staff exactly what happened — never a generic "verify"
         // message for a non-verification event.
         $name = trim($request->user()->first_name.' '.$request->user()->last_name);
-        $admins = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->get();
-        foreach ($admins as $admin) {
-            Notification::create([
-                'user_id' => $admin->id,
-                'title' => 'New Borrow Request',
-                'message' => "{$name} (@{$request->user()->username}) requested "
-                    ."{$equipment->name} ×{$data['quantity']} — waiting for your review.",
-                'type' => 'Borrow',
-            ]);
+        $adminIds = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->pluck('id');
+        $now = now();
+        $records = $adminIds->map(fn ($adminId) => [
+            'user_id' => $adminId,
+            'title' => 'New Borrow Request',
+            'message' => "{$name} (@{$request->user()->username}) requested "
+                ."{$equipment->name} ×{$data['quantity']} — waiting for your review.",
+            'type' => 'Borrow',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->all();
+        if (! empty($records)) {
+            Notification::insert($records);
         }
 
         return response()->json([
@@ -200,15 +204,19 @@ class MobileController extends Controller
         // Distinct return-request notification (type: Return) so the admin
         // inbox can distinguish it from borrow/verification events.
         $name = trim($request->user()->first_name.' '.$request->user()->last_name);
-        $admins = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->get();
-        foreach ($admins as $admin) {
-            Notification::create([
-                'user_id' => $admin->id,
-                'title' => 'New Return Request',
-                'message' => "{$name} (@{$request->user()->username}) submitted a return for request "
-                    ."#{$borrowing->id} — waiting for your review.",
-                'type' => 'Return',
-            ]);
+        $adminIds = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->pluck('id');
+        $now = now();
+        $records = $adminIds->map(fn ($adminId) => [
+            'user_id' => $adminId,
+            'title' => 'New Return Request',
+            'message' => "{$name} (@{$request->user()->username}) submitted a return for request "
+                ."#{$borrowing->id} — waiting for your review.",
+            'type' => 'Return',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->all();
+        if (! empty($records)) {
+            Notification::insert($records);
         }
 
         return response()->json([
@@ -320,14 +328,18 @@ class MobileController extends Controller
 
         // Queue a review notification for every administrator.
         $name = trim($user->first_name.' '.$user->last_name);
-        $admins = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->get();
-        foreach ($admins as $admin) {
-            Notification::create([
-                'user_id' => $admin->id,
-                'title' => 'Verification Documents Submitted',
-                'message' => "{$name} (@{$user->username}) has submitted ID photos for verification and is waiting for your review.",
-                'type' => 'Verification',
-            ]);
+        $adminIds = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->pluck('id');
+        $now = now();
+        $records = $adminIds->map(fn ($adminId) => [
+            'user_id' => $adminId,
+            'title' => 'Verification Documents Submitted',
+            'message' => "{$name} (@{$user->username}) has submitted ID photos for verification and is waiting for your review.",
+            'type' => 'Verification',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->all();
+        if (! empty($records)) {
+            Notification::insert($records);
         }
 
         return response()->json([
