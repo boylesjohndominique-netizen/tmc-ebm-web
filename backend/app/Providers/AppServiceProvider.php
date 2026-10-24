@@ -14,6 +14,8 @@ use App\Observers\NotificationObserver;
 use App\Observers\ReturnRequestObserver;
 use App\Observers\UserObserver;
 use App\Observers\UserPermissionObserver;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,6 +26,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Model::preventLazyLoading(! $this->app->isProduction());
+        DB::prohibitDestructiveCommands($this->app->isProduction());
+
         Equipment::observe(EquipmentObserver::class);
         BorrowingRequest::observe(BorrowingRequestObserver::class);
         ReturnRequest::observe(ReturnRequestObserver::class);
