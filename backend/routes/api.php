@@ -30,23 +30,23 @@ use Illuminate\Support\Facades\Route;
 Route::post('/login', [
     AuthController::class,
     'login',
-]);
+])->middleware('throttle:10,1');
 
 // Public student self-registration (mobile app) — creates a Pending account
 Route::post('/register', [
     AuthController::class,
     'register',
-]);
+])->middleware('throttle:10,1');
 
 Route::post('/register/send-code', [
     AuthController::class,
     'sendRegistrationCode',
-]);
+])->middleware('throttle:5,1');
 
 Route::post('/register/verify-code', [
     AuthController::class,
     'verifyRegistrationCode',
-]);
+])->middleware('throttle:10,1');
 
 // =====================================================
 // EMAIL VERIFICATION ROUTES (PUBLIC)
@@ -55,12 +55,12 @@ Route::post('/register/verify-code', [
 Route::post('/verify-email', [
     AuthController::class,
     'verifyEmail',
-]);
+])->middleware('throttle:10,1');
 
 Route::post('/resend-verification', [
     AuthController::class,
     'resendVerification',
-]);
+])->middleware('throttle:5,1');
 
 // =====================================================
 // MOBILE APP LOGIN
@@ -69,7 +69,7 @@ Route::post('/resend-verification', [
 Route::post('/mobile/login', [
     AuthController::class,
     'mobileLogin',
-]);
+])->middleware('throttle:10,1');
 
 // =====================================================
 // BAN APPEAL (PUBLIC — banned users have no valid token)
@@ -88,7 +88,7 @@ Route::post('/appeals', [
 Route::post('/forgot-password', [
     AuthController::class,
     'forgotPassword',
-]);
+])->middleware('throttle:5,1');
 
 // Public equipment image streaming (works across localhost, LAN, and ngrok)
 Route::get('/equipment-media/{filename}', [
@@ -105,7 +105,7 @@ Route::get('/user-avatar/{filename}', [
 Route::post('/reset-password', [
     AuthController::class,
     'resetPassword',
-]);
+])->middleware('throttle:5,1');
 
 // =====================================================
 // PROTECTED ROUTES
